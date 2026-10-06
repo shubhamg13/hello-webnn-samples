@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebNN Fast Style Transfer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui,-apple-system,sans-serif; background:#f5f5f5; color:#1a1a1a; padding:1.5rem; }
+    .container { max-width:960px; margin:0 auto; }
+    h1 { font-size:1.4rem; margin-bottom:.25rem; }
+    .subtitle { color:#666; font-size:.85rem; margin-bottom:1rem; }
+    .card { background:#fff; border-radius:6px; padding:1rem 1.25rem; margin-bottom:.75rem; box-shadow:0 1px 3px rgba(0,0,0,.08); }
+    .controls { display:flex; gap:.75rem; align-items:center; flex-wrap:wrap; }
+    label { font-weight:600; font-size:.85rem; }
+    select,button { padding:.3rem .75rem; border:1px solid #ddd; border-radius:4px; font-size:.85rem; cursor:pointer; }
+    button { background:rgba(0,47,167,1); color:#fff; border:none; font-weight:500; }
+    button:hover { background:rgba(0,47,167,.85); }
+    button:disabled { background:#ccc; cursor:not-allowed; }
+    .status { padding:.6rem 1rem; font-size:.85rem; border-radius:4px; margin-bottom:.75rem; }
+    .status.info { background:#e3f2fd; border-left:3px solid #2196F3; }
+    .status.success { background:#e9f8f0; border-left:3px solid #068906; }
+    .status.error { background:#ffebee; border-left:3px solid #f44336; }
+    .image-row { display:flex; gap:1rem; justify-content:center; flex-wrap:wrap; }
+    .image-col { flex:1; min-width:250px; max-width:450px; text-align:center; }
+    .image-col img,.image-col canvas { max-width:100%; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,.1); }
+    .image-col h4 { font-size:.8rem; color:#666; margin-bottom:.3rem; }
+  </style>
+</head>
+<body>
+<div class="container">
+<h1>WebNN Fast Style Transfer</h1>
+<p class="subtitle">Pure WebNN API — Starry Night style (540×540, IN, reflection pad)</p>
+<div class="card">
+<div class="controls">
+<label for="deviceSelect">Device:</label>
+<select id="deviceSelect"><option value="cpu">CPU</option><option value="gpu">GPU</option><option value="npu">NPU</option></select>
+<label for="styleSelect">Style:</label>
+<select id="styleSelect">
+  <option value="starry-night">Starry Night</option>
+  <option value="self-portrait">Self Portrait</option>
+  <option value="red-vineyards">Red Vineyards</option>
+  <option value="bedroom">Bedroom</option>
+  <option value="la-campesinos">La Campesinos</option>
+  <option value="soup-distribution">Soup Distribution</option>
+</select>
+<input type="file" id="imageInput" accept="image/*" style="display:none">
+<button id="uploadBtn" onclick="document.getElementById('imageInput').click()">Choose Image</button>
+<button id="runBtn" onclick="run()">Run Style Transfer</button>
+</div>
+</div>
+<div id="status" class="status info">Ready. Select device and click Run Style Transfer.</div>
+<div class="image-row">
+<div class="image-col"><h4>Input</h4><img id="inputImage" src="travelspace.jpg" alt="Input" crossorigin="anonymous"></div>
+<div class="image-col"><h4>Stylized</h4><canvas id="outputCanvas"></canvas></div>
+</div>
+</div>
+
+<script>
+var _B,_wbuf,_winfo,_e,_p0;
+function $(id){return document.getElementById(id);}
+function sS(m,c){$('status').textContent=m;$('status').className='status '+(c||'info');}
+
+var NAMES=["Variable_read__0__cf__0_0","Variable_1_read__1__cf__1_0","Variable_2_read__12__cf__12_0",
+"Variable_3_read__23__cf__23_0","Variable_4_read__34__cf__34_0","Variable_5_read__43__cf__43_0",
+"Variable_6_read__44__cf__44_0","Variable_7_read__45__cf__45_0","Variable_8_read__46__cf__46_0",
+"Variable_9_read__47__cf__47_0","Variable_10_read__2__cf__2_0","Variable_11_read__3__cf__3_0",
+"Variable_12_read__4__cf__4_0","Variable_13_read__5__cf__5_0","Variable_14_read__6__cf__6_0",
+"Variable_15_read__7__cf__7_0","Variable_16_read__8__cf__8_0","Variable_17_read__9__cf__9_0",
+"Variable_18_read__10__cf__10_0","Variable_19_read__11__cf__11_0","Variable_20_read__13__cf__13_0",
+"Variable_21_read__14__cf__14_0","Variable_22_read__15__cf__15_0","Variable_23_read__16__cf__16_0",
+"Variable_24_read__17__cf__17_0","Variable_25_read__18__cf__18_0","Variable_26_read__19__cf__19_0",
+"Variable_27_read__20__cf__20_0","Variable_28_read__21__cf__21_0","Variable_29_read__22__cf__22_0",
+"Variable_30_read__24__cf__24_0","Variable_31_read__25__cf__25_0","Variable_32_read__26__cf__26_0",
+"Variable_33_read__27__cf__27_0","Variable_34_read__28__cf__28_0","Variable_35_read__29__cf__29_0",
+"Variable_36_read__30__cf__30_0","Variable_37_read__31__cf__31_0","Variable_38_read__32__cf__32_0",
+"Variable_39_read__33__cf__33_0","Variable_40_read__35__cf__35_0","Variable_41_read__36__cf__36_0",
+"Variable_42_read__37__cf__37_0","Variable_43_read__38__cf__38_0","Variable_44_read__39__cf__39_0",
+"Variable_45_read__40__cf__40_0","Variable_46_read__41__cf__41_0","Variable_47_read__42__cf__42_0"];
+
+function W(idx){
+  var n=NAMES[idx],wi=_winfo.tensors[n];
+  return _B.constant({shape:wi.shape,dataType:'float32'},new Float32Array(_wbuf.slice(wi.byteOffset,wi.byteOffset+wi.byteLength)));
+}
+
+function IN(x,scale,beta){
+  var m=_B.reduceMean(x,{axes:[2,3],keepDimensions:true});
+  var s=_B.sub(x,m);
+  var v=_B.reduceMean(_B.mul(s,s),{axes:[2,3],keepDimensions:true});
+  return _B.add(_B.mul(scale,_B.div(s,_B.pow(_B.add(v,_e),_p0))),beta);
+}
+</script>
+
+<script>
+async function run(){
+  var btn=$('runBtn'),img=$('inputImage'),dev=$('deviceSelect').value;
+  try{
+    btn.disabled=true;
+    if(!img.complete){sS('Waiting for image...','info');await new Promise(function(r){img.onload=r;});}
+
+    sS('Loading weights (110 KB)...','info');
+    var style=$('styleSelect').value;
+    var wh=fetch(style+'.weights').then(function(r){return r.arrayBuffer();});
+    var wj=fetch(style+'.manifest.json').then(function(r){return r.json();});
+    _wbuf=await wh;_winfo=await wj;
+
+    sS('Creating WebNN context ('+dev.toUpperCase()+')...','info');
+    var ctx=await navigator.ml.createContext({deviceType:dev});
+    if(typeof MLTensorUsage=='undefined')window.MLTensorUsage={WEBGPU_INTEROP:1,READ:2,WRITE:4};
+    _B=new MLGraphBuilder(ctx);
+
+    _e=_B.constant({dataType:'float32',dimensions:[1],shape:[1]},new Float32Array([9.999999717180685e-10]));
+    _p0=_B.constant({dataType:'float32',dimensions:[1],shape:[1]},new Float32Array([0.5]));
+    var c150=_B.constant({dataType:'float32',dimensions:[1],shape:[1]},new Float32Array([150]));
+    var c127=_B.constant({dataType:'float32',dimensions:[1],shape:[1]},new Float32Array([127.5]));
+
+    sS('Building graph...','info');
+    var t0=performance.now();
+    var p1=[0,0,1,1],p4=[0,0,4,4];
+
+    var inp=_B.input('input',{dataType:'float32',shape:[1,3,540,540]});
+
+    // conv0: pad4 → conv [4,3,9,9] → IN → relu
+    var x=_B.conv2d(_B.pad(inp,p4,p4,{mode:'reflection'}),W(0));
+    x=_B.relu(IN(x,W(2),W(1))); // [1,4,H,W]
+
+    // conv1: pad1 → conv [8,4,3,3] stride2 → IN → relu
+    x=_B.relu(IN(_B.conv2d(_B.pad(x,p1,p1,{mode:'reflection'}),W(3),{strides:[2,2]}),W(5),W(4)));
+
+    // conv2: pad1 → conv [16,8,3,3] stride2 → IN → relu (save relu2)
+    var r2=_B.relu(IN(_B.conv2d(_B.pad(x,p1,p1,{mode:'reflection'}),W(6),{strides:[2,2]}),W(8),W(7)));
+
+    // conv3: pad1 → conv [16,16,3,3] → IN → relu
+    x=_B.relu(IN(_B.conv2d(_B.pad(r2,p1,p1,{mode:'reflection'}),W(9)),W(11),W(10)));
+
+    // conv4: pad1 → conv [16,16,3,3] → IN, residual + r2
+    x=_B.add(r2,IN(_B.conv2d(_B.pad(x,p1,p1,{mode:'reflection'}),W(12)),W(14),W(13)));
+
+    // conv5: pad1 → conv [16,16,3,3] → IN → relu
+    x=_B.relu(IN(_B.conv2d(_B.pad(x,p1,p1,{mode:'reflection'}),W(15)),W(17),W(16)));
+
+    // conv6: pad1 → conv [16,16,3,3] → IN, residual
+    x=_B.add(x,IN(_B.conv2d(_B.pad(x,p1,p1,{mode:'reflection'}),W(18)),W(20),W(19)));
+
+    // conv7: pad1 → conv [16,16,3,3] → IN → relu
+    x=_B.relu(IN(_B.conv2d(_B.pad(x,p1,p1,{mode:'reflection'}),W(21)),W(23),W(22)));
+
+    // conv8: pad1 → conv [16,16,3,3] → IN, residual
+    x=_B.add(x,IN(_B.conv2d(_B.pad(x,p1,p1,{mode:'reflection'}),W(24)),W(26),W(25)));
+
+    // conv9: pad1 → conv [16,16,3,3] → IN → relu
+    x=_B.relu(IN(_B.conv2d(_B.pad(x,p1,p1,{mode:'reflection'}),W(27)),W(29),W(28)));
+
+    // conv10: pad1 → conv [16,16,3,3] → IN, residual
+    x=_B.add(x,IN(_B.conv2d(_B.pad(x,p1,p1,{mode:'reflection'}),W(30)),W(32),W(31)));
+
+    // conv11: pad1 → conv [16,16,3,3] → IN → relu
+    x=_B.relu(IN(_B.conv2d(_B.pad(x,p1,p1,{mode:'reflection'}),W(33)),W(35),W(34)));
+
+    // conv12: pad1 → conv [16,16,3,3] → IN, residual
+    x=_B.add(x,IN(_B.conv2d(_B.pad(x,p1,p1,{mode:'reflection'}),W(36)),W(38),W(37)));
+
+    // convTranspose0: [16,8,3,3] stride2 → out270 → IN → relu
+    x=_B.relu(IN(_B.convTranspose2d(x,W(39),{padding:[0,1,0,1],strides:[2,2],outputSizes:[270,270],filterLayout:'iohw'}),W(41),W(40)));
+
+    // convTranspose1: [8,4,3,3] stride2 → out540 → IN → relu
+    x=_B.relu(IN(_B.convTranspose2d(x,W(42),{padding:[0,1,0,1],strides:[2,2],outputSizes:[540,540],filterLayout:'iohw'}),W(44),W(43)));
+
+    // conv13: pad4 → conv [3,4,9,9] → IN
+    x=IN(_B.conv2d(_B.pad(x,p4,p4,{mode:'reflection'}),W(45)),W(47),W(46));
+
+    // output: add(mul(tanh(x), 150), 127.5)
+    var out=_B.add(_B.mul(_B.tanh(x),c150),c127);
+
+    var buildTime=(performance.now()-t0).toFixed(0);
+    var graph=await _B.build({'output':out});
+
+    sS('Preprocessing...','info');
+    var can=document.createElement('canvas');can.width=540;can.height=540;
+    var cctx=can.getContext('2d');cctx.drawImage(img,0,0,540,540);
+    var idata=cctx.getImageData(0,0,540,540).data;
+    var N=540*540,tensor=new Float32Array(3*N);
+    for(var i=0;i<N;i++){tensor[i]=idata[i*4];tensor[N+i]=idata[i*4+1];tensor[2*N+i]=idata[i*4+2];}
+
+    var inT=await ctx.createTensor({dataType:'float32',shape:[1,3,540,540],writable:true});
+    var outT=await ctx.createTensor({dataType:'float32',shape:[1,3,540,540],readable:true});
+
+    sS('Running inference...','info');
+    ctx.writeTensor(inT,tensor);
+    var ti=performance.now();
+    ctx.dispatch(graph,{'input':inT},{'output':outT});
+    var output=new Float32Array(await ctx.readTensor(outT));
+    var inferTime=(performance.now()-ti).toFixed(0);
+
+    // Draw output: NCHW → canvas (clamp to [0,255])
+    var outCanvas=$('outputCanvas');
+    outCanvas.width=540;outCanvas.height=540;
+    var octx=outCanvas.getContext('2d');
+    var oimg=octx.createImageData(540,540);
+    for(var i=0;i<N;i++){
+      oimg.data[i*4]=Math.max(0,Math.min(255,output[i]));
+      oimg.data[i*4+1]=Math.max(0,Math.min(255,output[N+i]));
+      oimg.data[i*4+2]=Math.max(0,Math.min(255,output[2*N+i]));
+      oimg.data[i*4+3]=255;
+    }
+    octx.putImageData(oimg,0,0);
+
+    sS('Done. Build:'+buildTime+'ms | Inference:'+inferTime+'ms | Device:'+dev.toUpperCase(),'success');
+  }catch(e){sS('Error: '+e.message,'error');console.error(e);}
+  finally{btn.disabled=false;}
+}
+
+window.addEventListener('load',function(){
+  $('imageInput').addEventListener('change',function(e){
+    var f=e.target.files[0];if(!f)return;
+    $('inputImage').src=URL.createObjectURL(f);
+    sS('Image loaded. Click Run Style Transfer.','info');
+  });
+});
+</script>
+</body>
+</html>

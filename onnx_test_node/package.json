@@ -1,0 +1,9 @@
+{
+  "name": "onnx-precision-compare",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "onnxruntime-node": "^1.19.0",
+    "jimp": "^1.6.0"
+  }
+}

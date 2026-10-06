@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Face Detection</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+    .container {
+      position: relative;
+      display: inline-block;
+      margin: 0 auto;
+    }
+    #image {
+      max-width: 100%;
+      display: block;
+    }
+    #overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
+    #status {
+      text-align: center;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: #fff;
+      border-radius: 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+<body>
+  <h1>Face Detection</h1>
+  <div id="status">Select model and click Run</div>
+  <div>
+    <select id="modelSelect">
+      <option value="tflite">TFLite</option>
+      <option value="tfjs">TFJS</option>
+    </select>
+    <select id="backendSelect">
+      <option value="cpu">CPU</option>
+      <option value="webgl">WebGL</option>
+    </select>
+    <label><input type="checkbox" id="landmarksCheck"> Face Landmarks</label>
+    <button id="runBtn">Run Detection</button>
+  </div>
+  <div class="container">
+    <img id="image" src="../assets/portrait.jpg" alt="Portrait">
+    <canvas id="overlay"></canvas>
+  </div>
+  <h2>ROI Debug (192x192)</h2>
+  <canvas id="roiCanvas" width="192" height="192" style="width: 192px; height: 192px;"></canvas>
+
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-cpu@4.17.0/dist/tf-backend-cpu.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.17.0/dist/tf-backend-webgl.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-tflite@0.0.1-alpha.3/dist/tf-tflite.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

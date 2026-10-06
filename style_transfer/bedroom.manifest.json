@@ -1,0 +1,485 @@
+{
+  "format": "wg-weights-manifest",
+  "tensors": {
+    "Variable_read__0__cf__0_0": {
+      "byteOffset": 4,
+      "byteLength": 3888,
+      "shape": [
+        4,
+        3,
+        9,
+        9
+      ]
+    },
+    "Variable_1_read__1__cf__1_0": {
+      "byteOffset": 3892,
+      "byteLength": 16,
+      "shape": [
+        1,
+        4,
+        1,
+        1
+      ]
+    },
+    "Variable_2_read__12__cf__12_0": {
+      "byteOffset": 3908,
+      "byteLength": 16,
+      "shape": [
+        1,
+        4,
+        1,
+        1
+      ]
+    },
+    "Variable_3_read__23__cf__23_0": {
+      "byteOffset": 3924,
+      "byteLength": 1152,
+      "shape": [
+        8,
+        4,
+        3,
+        3
+      ]
+    },
+    "Variable_4_read__34__cf__34_0": {
+      "byteOffset": 5076,
+      "byteLength": 32,
+      "shape": [
+        1,
+        8,
+        1,
+        1
+      ]
+    },
+    "Variable_5_read__43__cf__43_0": {
+      "byteOffset": 5108,
+      "byteLength": 32,
+      "shape": [
+        1,
+        8,
+        1,
+        1
+      ]
+    },
+    "Variable_6_read__44__cf__44_0": {
+      "byteOffset": 5140,
+      "byteLength": 4608,
+      "shape": [
+        16,
+        8,
+        3,
+        3
+      ]
+    },
+    "Variable_7_read__45__cf__45_0": {
+      "byteOffset": 9748,
+      "byteLength": 64,
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ]
+    },
+    "Variable_8_read__46__cf__46_0": {
+      "byteOffset": 9812,
+      "byteLength": 64,
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ]
+    },
+    "Variable_9_read__47__cf__47_0": {
+      "byteOffset": 9876,
+      "byteLength": 9216,
+      "shape": [
+        16,
+        16,
+        3,
+        3
+      ]
+    },
+    "Variable_10_read__2__cf__2_0": {
+      "byteOffset": 19092,
+      "byteLength": 64,
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ]
+    },
+    "Variable_11_read__3__cf__3_0": {
+      "byteOffset": 19156,
+      "byteLength": 64,
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ]
+    },
+    "Variable_12_read__4__cf__4_0": {
+      "byteOffset": 19220,
+      "byteLength": 9216,
+      "shape": [
+        16,
+        16,
+        3,
+        3
+      ]
+    },
+    "Variable_13_read__5__cf__5_0": {
+      "byteOffset": 28436,
+      "byteLength": 64,
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ]
+    },
+    "Variable_14_read__6__cf__6_0": {
+      "byteOffset": 28500,
+      "byteLength": 64,
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ]
+    },
+    "Variable_15_read__7__cf__7_0": {
+      "byteOffset": 28564,
+      "byteLength": 9216,
+      "shape": [
+        16,
+        16,
+        3,
+        3
+      ]
+    },
+    "Variable_16_read__8__cf__8_0": {
+      "byteOffset": 37780,
+      "byteLength": 64,
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ]
+    },
+    "Variable_17_read__9__cf__9_0": {
+      "byteOffset": 37844,
+      "byteLength": 64,
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ]
+    },
+    "Variable_18_read__10__cf__10_0": {
+      "byteOffset": 37908,
+      "byteLength": 9216,
+      "shape": [
+        16,
+        16,
+        3,
+        3
+      ]
+    },
+    "Variable_19_read__11__cf__11_0": {
+      "byteOffset": 47124,
+      "byteLength": 64,
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ]
+    },
+    "Variable_20_read__13__cf__13_0": {
+      "byteOffset": 47188,
+      "byteLength": 64,
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ]
+    },
+    "Variable_21_read__14__cf__14_0": {
+      "byteOffset": 47252,
+      "byteLength": 9216,
+      "shape": [
+        16,
+        16,
+        3,
+        3
+      ]
+    },
+    "Variable_22_read__15__cf__15_0": {
+      "byteOffset": 56468,
+      "byteLength": 64,
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ]
+    },
+    "Variable_23_read__16__cf__16_0": {
+      "byteOffset": 56532,
+      "byteLength": 64,
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ]
+    },
+    "Variable_24_read__17__cf__17_0": {
+      "byteOffset": 56596,
+      "byteLength": 9216,
+      "shape": [
+        16,
+        16,
+        3,
+        3
+      ]
+    },
+    "Variable_25_read__18__cf__18_0": {
+      "byteOffset": 65812,
+      "byteLength": 64,
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ]
+    },
+    "Variable_26_read__19__cf__19_0": {
+      "byteOffset": 65876,
+      "byteLength": 64,
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ]
+    },
+    "Variable_27_read__20__cf__20_0": {
+      "byteOffset": 65940,
+      "byteLength": 9216,
+      "shape": [
+        16,
+        16,
+        3,
+        3
+      ]
+    },
+    "Variable_28_read__21__cf__21_0": {
+      "byteOffset": 75156,
+      "byteLength": 64,
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ]
+    },
+    "Variable_29_read__22__cf__22_0": {
+      "byteOffset": 75220,
+      "byteLength": 64,
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ]
+    },
+    "Variable_30_read__24__cf__24_0": {
+      "byteOffset": 75284,
+      "byteLength": 9216,
+      "shape": [
+        16,
+        16,
+        3,
+        3
+      ]
+    },
+    "Variable_31_read__25__cf__25_0": {
+      "byteOffset": 84500,
+      "byteLength": 64,
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ]
+    },
+    "Variable_32_read__26__cf__26_0": {
+      "byteOffset": 84564,
+      "byteLength": 64,
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ]
+    },
+    "Variable_33_read__27__cf__27_0": {
+      "byteOffset": 84628,
+      "byteLength": 9216,
+      "shape": [
+        16,
+        16,
+        3,
+        3
+      ]
+    },
+    "Variable_34_read__28__cf__28_0": {
+      "byteOffset": 93844,
+      "byteLength": 64,
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ]
+    },
+    "Variable_35_read__29__cf__29_0": {
+      "byteOffset": 93908,
+      "byteLength": 64,
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ]
+    },
+    "Variable_36_read__30__cf__30_0": {
+      "byteOffset": 93972,
+      "byteLength": 9216,
+      "shape": [
+        16,
+        16,
+        3,
+        3
+      ]
+    },
+    "Variable_37_read__31__cf__31_0": {
+      "byteOffset": 103188,
+      "byteLength": 64,
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ]
+    },
+    "Variable_38_read__32__cf__32_0": {
+      "byteOffset": 103252,
+      "byteLength": 64,
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ]
+    },
+    "Variable_39_read__33__cf__33_0": {
+      "byteOffset": 103316,
+      "byteLength": 4608,
+      "shape": [
+        16,
+        8,
+        3,
+        3
+      ]
+    },
+    "Variable_40_read__35__cf__35_0": {
+      "byteOffset": 107924,
+      "byteLength": 32,
+      "shape": [
+        1,
+        8,
+        1,
+        1
+      ]
+    },
+    "Variable_41_read__36__cf__36_0": {
+      "byteOffset": 107956,
+      "byteLength": 32,
+      "shape": [
+        1,
+        8,
+        1,
+        1
+      ]
+    },
+    "Variable_42_read__37__cf__37_0": {
+      "byteOffset": 107988,
+      "byteLength": 1152,
+      "shape": [
+        8,
+        4,
+        3,
+        3
+      ]
+    },
+    "Variable_43_read__38__cf__38_0": {
+      "byteOffset": 109140,
+      "byteLength": 16,
+      "shape": [
+        1,
+        4,
+        1,
+        1
+      ]
+    },
+    "Variable_44_read__39__cf__39_0": {
+      "byteOffset": 109156,
+      "byteLength": 16,
+      "shape": [
+        1,
+        4,
+        1,
+        1
+      ]
+    },
+    "Variable_45_read__40__cf__40_0": {
+      "byteOffset": 109172,
+      "byteLength": 3888,
+      "shape": [
+        3,
+        4,
+        9,
+        9
+      ]
+    },
+    "Variable_46_read__41__cf__41_0": {
+      "byteOffset": 113060,
+      "byteLength": 12,
+      "shape": [
+        1,
+        3,
+        1,
+        1
+      ]
+    },
+    "Variable_47_read__42__cf__42_0": {
+      "byteOffset": 113072,
+      "byteLength": 12,
+      "shape": [
+        1,
+        3,
+        1,
+        1
+      ]
+    }
+  }
+}

@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Preprocessing Test</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-cpu@4.10.0/dist/tf-backend-cpu.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.10.0/dist/tf-backend-webgl.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tflite-util/tflite_util.js"></script>
+  <style>
+    body { font-family: monospace; padding: 20px; }
+    #status { white-space: pre-wrap; background: #f0f0f0; padding: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Preprocessing Test</h1>
+  <img id="image" src="../assets/portrait.jpg" style="max-width: 300px;">
+  <div id="status">Loading...</div>
+  <script src="preprocess_test.js"></script>
+</body>
+</html>

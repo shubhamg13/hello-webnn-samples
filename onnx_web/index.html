@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ONNX Face Landmarker</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h1 { text-align: center; color: #333; }
+    .container {
+      position: relative;
+      display: inline-block;
+      margin: 0 auto;
+    }
+    #image { max-width: 100%; display: block; }
+    #overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
+    #status {
+      text-align: center;
+      padding: 10px;
+      margin-bottom: 10px;
+      background: #fff;
+      border-radius: 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .controls {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .controls button {
+      padding: 8px 20px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .controls button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <h1>ONNX Face Landmarker</h1>
+  <div id="status">Ready</div>
+  <div class="controls">
+    <button id="runBtn">Run</button>
+    <button id="clearBtn">Clear</button>
+    <select id="backendSelect">
+      <option value="wasm">WASM (CPU)</option>
+      <option value="webgl">WebGL (GPU)</option>
+      <option value="webgpu">WebGPU (GPU)</option>
+      <option value="webnn">WebNN (NPU/GPU)</option>
+    </select>
+    <label><input type="checkbox" id="landmarksCheck"> Face Landmarks</label>
+    <label><input type="checkbox" id="debugRoiCheck"> Show ROI</label>
+  </div>
+  <div class="container">
+    <img id="image" src="../assets/portrait.jpg" alt="Portrait">
+    <canvas id="overlay"></canvas>
+  </div>
+  <canvas id="roiCanvas" style="display:none"></canvas>
+
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.all.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

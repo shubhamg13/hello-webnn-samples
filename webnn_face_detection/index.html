@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebNN Face Detection</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f5f5f5; color: #1a1a1a; padding: 1.5rem;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+    h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+    .subtitle { color: #666; font-size: 0.85rem; margin-bottom: 1rem; }
+
+    .card {
+      background: #fff; border-radius: 6px; padding: 1rem 1.25rem;
+      margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    .controls {
+      display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;
+    }
+    label { font-weight: 600; font-size: 0.85rem; }
+    select, button {
+      padding: 0.3rem 0.75rem; border: 1px solid #ddd;
+      border-radius: 4px; font-size: 0.85rem; cursor: pointer;
+    }
+    button {
+      background: rgba(0,47,167,1); color: #fff; border: none;
+      font-weight: 500;
+    }
+    button:hover { background: rgba(0,47,167,0.85); }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+
+    .status {
+      padding: 0.6rem 1rem; font-size: 0.85rem; border-radius: 4px;
+      margin-bottom: 0.75rem;
+    }
+    .status.info { background: #e3f2fd; border-left: 3px solid #2196F3; }
+    .status.success { background: #e9f8f0; border-left: 3px solid #068906; }
+    .status.error { background: #ffebee; border-left: 3px solid #f44336; }
+
+    .image-wrapper { text-align: center; margin: 1rem 0; }
+    .image-container {
+      position: relative; display: inline-block; line-height: 0;
+    }
+    #image {
+      max-width: 100%; max-height: 55vh; display: block;
+    }
+    #overlay {
+      position: absolute; top: 0; left: 0; pointer-events: none;
+    }
+    .det-box {
+      position: absolute; border: 2.5px solid #00FF00; box-sizing: border-box;
+    }
+    .det-label {
+      position: absolute; color: #00FF00; font-size: 14px; font-weight: 600;
+      font-family: system-ui, sans-serif; white-space: nowrap;
+      text-shadow: 0 0 3px rgba(0,0,0,0.7);
+    }
+    .keypoint {
+      position: absolute; width: 8px; height: 8px; border-radius: 50%;
+      transform: translate(-50%, -50%); border: 1px solid #fff;
+    }
+
+    table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.8rem; }
+    th, td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid #eee; }
+    th { color: #666; font-weight: 600; white-space: nowrap; }
+    td { font-family: monospace; font-size: 0.75rem; }
+
+    pre {
+      margin: 0.35rem 0; background: #f5f5f5; padding: 0.4rem 0.75rem;
+      overflow-x: auto; font-size: 0.75rem; max-height: 150px;
+      white-space: pre-wrap; word-break: break-all;
+    }
+    .section-label {
+      font-size: 0.8rem; font-weight: 600; color: #666;
+      margin-top: 0.75rem; margin-bottom: 0.3rem;
+    }
+    #resultsCard { display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>WebNN Face Detection</h1>
+    <p class="subtitle">Face detection inference via WebNN with CPU / GPU / NPU device selection</p>
+
+    <div class="card">
+      <div class="controls">
+        <label for="deviceSelect">Device:</label>
+        <select id="deviceSelect">
+          <option value="cpu">CPU</option>
+          <option value="gpu">GPU</option>
+          <option value="npu">NPU</option>
+        </select>
+        <input type="file" id="imageInput" accept="image/*" style="display:none">
+        <button id="uploadBtn" onclick="document.getElementById('imageInput').click()">Choose Image</button>
+        <button id="runBtn" onclick="runDetection()">Run Detection</button>
+      </div>
+    </div>
+
+    <div id="status" class="status info">Ready. Select a device and click Run Detection.</div>
+
+    <div class="image-wrapper">
+      <div class="image-container">
+        <img id="image" src="../assets/portrait.jpg" alt="Input image">
+        <div id="overlay"></div>
+      </div>
+    </div>
+
+    <div class="card" id="resultsCard">
+      <h3>Results</h3>
+      <div id="results"></div>
+    </div>
+  </div>
+
+  <script>
+    // ============ CONSTANTS ============
+    const MIN_SCORE = 0.5;
+    const MIN_SUPPRESSION_THRESHOLD = 0.3;
+    const RAW_SCORE_LIMIT = 80;
+
+    const SSD_OPTIONS_SHORT = {
+      num_layers: 4,
+      input_size_height: 128,
+      input_size_width: 128,
+      anchor_offset_x: 0.5,
+      anchor_offset_y: 0.5,
+      strides: [8, 16, 16, 16],
+      interpolated_scale_aspect_ratio: 1.0
+    };
+
+    const FaceIndex = {
+      LEFT_EYE: 0,
+      RIGHT_EYE: 1,
+      NOSE_TIP: 2,
+      MOUTH: 3,
+      LEFT_EYE_TRAGION: 4,
+      RIGHT_EYE_TRAGION: 5
+    };
+
+    const KEYPOINT_NAMES = ['Left Eye', 'Right Eye', 'Nose Tip', 'Mouth', 'L-Ear Trag', 'R-Ear Trag'];
+
+    // ============ WEIGHTS FILE ============
+    class WeightsFile {
+      constructor(buffer, manifest) {
+        this.buffer = buffer;
+        this.manifest = manifest;
+      }
+      static async load(weightsPath, manifestPath) {
+        const [wRes, mRes] = await Promise.all([fetch(weightsPath), fetch(manifestPath)]);
+        if (!wRes.ok) throw new Error('Failed to load weights: ' + wRes.statusText);
+        if (!mRes.ok) throw new Error('Failed to load manifest: ' + mRes.statusText);
+        const buffer = await wRes.arrayBuffer();
+        const manifest = await mRes.json();
+        if (manifest.format !== 'wg-weights-manifest') throw new Error('Invalid manifest format');
+        const magic = new TextDecoder().decode(new Uint8Array(buffer, 0, 4));
+        if (magic !== 'WGWT') throw new Error('Invalid weights file');
+        return new WeightsFile(buffer, manifest);
+      }
+      getSlice(name) {
+        const t = this.manifest.tensors[name];
+        if (!t) throw new Error('Tensor not found: ' + name);
+        return t;
+      }
+    }
+
+    // ============ BUILD GRAPH ============
+    async function buildGraph(context, weights) {
+      const builder = new MLGraphBuilder(context);
+      const input = builder.input('input', { dataType: 'float32', shape: [1,128,128,3] });
+
+      const const_fold_opt__408 = builder.constant(
+        { dataType: 'float32', shape: [24,3,5,5] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__408').byteOffset,
+          weights.getSlice('const_fold_opt__408').byteOffset + weights.getSlice('const_fold_opt__408').byteLength
+        ))
+      );
+      const const_fold_opt__440 = builder.constant(
+        { dataType: 'float32', shape: [24] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__440').byteOffset,
+          weights.getSlice('const_fold_opt__440').byteOffset + weights.getSlice('const_fold_opt__440').byteLength
+        ))
+      );
+      const const_fold_opt__479 = builder.constant(
+        { dataType: 'float32', shape: [24,1,3,3] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__479').byteOffset,
+          weights.getSlice('const_fold_opt__479').byteOffset + weights.getSlice('const_fold_opt__479').byteLength
+        ))
+      );
+      const const_fold_opt__398 = builder.constant(
+        { dataType: 'float32', shape: [24] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__398').byteOffset,
+          weights.getSlice('const_fold_opt__398').byteOffset + weights.getSlice('const_fold_opt__398').byteLength
+        ))
+      );
+      const const_fold_opt__397 = builder.constant(
+        { dataType: 'float32', shape: [24,24,1,1] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__397').byteOffset,
+          weights.getSlice('const_fold_opt__397').byteOffset + weights.getSlice('const_fold_opt__397').byteLength
+        ))
+      );
+      const const_fold_opt__381 = builder.constant(
+        { dataType: 'float32', shape: [24] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__381').byteOffset,
+          weights.getSlice('const_fold_opt__381').byteOffset + weights.getSlice('const_fold_opt__381').byteLength
+        ))
+      );
+      const const_fold_opt__483 = builder.constant(
+        { dataType: 'float32', shape: [24,1,3,3] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__483').byteOffset,
+          weights.getSlice('const_fold_opt__483').byteOffset + weights.getSlice('const_fold_opt__483').byteLength
+        ))
+      );
+      const const_fold_opt__471 = builder.constant(
+        { dataType: 'float32', shape: [28,24,1,1] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__471').byteOffset,
+          weights.getSlice('const_fold_opt__471').byteOffset + weights.getSlice('const_fold_opt__471').byteLength
+        ))
+      );
+      const const_fold_opt__330 = builder.constant(
+        { dataType: 'float32', shape: [28] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__330').byteOffset,
+          weights.getSlice('const_fold_opt__330').byteOffset + weights.getSlice('const_fold_opt__330').byteLength
+        ))
+      );
+      const const_fold_opt__430 = builder.constant(
+        { dataType: 'float32', shape: [28,1,3,3] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__430').byteOffset,
+          weights.getSlice('const_fold_opt__430').byteOffset + weights.getSlice('const_fold_opt__430').byteLength
+        ))
+      );
+      const const_fold_opt__366 = builder.constant(
+        { dataType: 'float32', shape: [28] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__366').byteOffset,
+          weights.getSlice('const_fold_opt__366').byteOffset + weights.getSlice('const_fold_opt__366').byteLength
+        ))
+      );
+      const const_fold_opt__478 = builder.constant(
+        { dataType: 'float32', shape: [32,28,1,1] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__478').byteOffset,
+          weights.getSlice('const_fold_opt__478').byteOffset + weights.getSlice('const_fold_opt__478').byteLength
+        ))
+      );
+      const const_fold_opt__347 = builder.constant(
+        { dataType: 'float32', shape: [32] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__347').byteOffset,
+          weights.getSlice('const_fold_opt__347').byteOffset + weights.getSlice('const_fold_opt__347').byteLength
+        ))
+      );
+      const const_fold_opt__447 = builder.constant(
+        { dataType: 'float32', shape: [32,1,3,3] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__447').byteOffset,
+          weights.getSlice('const_fold_opt__447').byteOffset + weights.getSlice('const_fold_opt__447').byteLength
+        ))
+      );
+      const const_fold_opt__468 = builder.constant(
+        { dataType: 'float32', shape: [32] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__468').byteOffset,
+          weights.getSlice('const_fold_opt__468').byteOffset + weights.getSlice('const_fold_opt__468').byteLength
+        ))
+      );
+      const const_fold_opt__409 = builder.constant(
+        { dataType: 'float32', shape: [36,32,1,1] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__409').byteOffset,
+          weights.getSlice('const_fold_opt__409').byteOffset + weights.getSlice('const_fold_opt__409').byteLength
+        ))
+      );
+      const const_fold_opt__385 = builder.constant(
+        { dataType: 'float32', shape: [36] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__385').byteOffset,
+          weights.getSlice('const_fold_opt__385').byteOffset + weights.getSlice('const_fold_opt__385').byteLength
+        ))
+      );
+      const const_fold_opt__458 = builder.constant(
+        { dataType: 'float32', shape: [36,1,3,3] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__458').byteOffset,
+          weights.getSlice('const_fold_opt__458').byteOffset + weights.getSlice('const_fold_opt__458').byteLength
+        ))
+      );
+      const const_fold_opt__378 = builder.constant(
+        { dataType: 'float32', shape: [36] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__378').byteOffset,
+          weights.getSlice('const_fold_opt__378').byteOffset + weights.getSlice('const_fold_opt__378').byteLength
+        ))
+      );
+      const const_fold_opt__467 = builder.constant(
+        { dataType: 'float32', shape: [42,36,1,1] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__467').byteOffset,
+          weights.getSlice('const_fold_opt__467').byteOffset + weights.getSlice('const_fold_opt__467').byteLength
+        ))
+      );
+      const const_fold_opt__322 = builder.constant(
+        { dataType: 'float32', shape: [42] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__322').byteOffset,
+          weights.getSlice('const_fold_opt__322').byteOffset + weights.getSlice('const_fold_opt__322').byteLength
+        ))
+      );
+      const const_fold_opt__451 = builder.constant(
+        { dataType: 'float32', shape: [42,1,3,3] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__451').byteOffset,
+          weights.getSlice('const_fold_opt__451').byteOffset + weights.getSlice('const_fold_opt__451').byteLength
+        ))
+      );
+      const const_fold_opt__337 = builder.constant(
+        { dataType: 'float32', shape: [42] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__337').byteOffset,
+          weights.getSlice('const_fold_opt__337').byteOffset + weights.getSlice('const_fold_opt__337').byteLength
+        ))
+      );
+      const const_fold_opt__466 = builder.constant(
+        { dataType: 'float32', shape: [48,1,3,3] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__466').byteOffset,
+          weights.getSlice('const_fold_opt__466').byteOffset + weights.getSlice('const_fold_opt__466').byteLength
+        ))
+      );
+      const const_fold_opt__329 = builder.constant(
+        { dataType: 'float32', shape: [48] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__329').byteOffset,
+          weights.getSlice('const_fold_opt__329').byteOffset + weights.getSlice('const_fold_opt__329').byteLength
+        ))
+      );
+      const const_fold_opt__415 = builder.constant(
+        { dataType: 'float32', shape: [48,42,1,1] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__415').byteOffset,
+          weights.getSlice('const_fold_opt__415').byteOffset + weights.getSlice('const_fold_opt__415').byteLength
+        ))
+      );
+      const const_fold_opt__319 = builder.constant(
+        { dataType: 'float32', shape: [48] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__319').byteOffset,
+          weights.getSlice('const_fold_opt__319').byteOffset + weights.getSlice('const_fold_opt__319').byteLength
+        ))
+      );
+      const const_fold_opt__473 = builder.constant(
+        { dataType: 'float32', shape: [56,1,3,3] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__473').byteOffset,
+          weights.getSlice('const_fold_opt__473').byteOffset + weights.getSlice('const_fold_opt__473').byteLength
+        ))
+      );
+      const const_fold_opt__357 = builder.constant(
+        { dataType: 'float32', shape: [56] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__357').byteOffset,
+          weights.getSlice('const_fold_opt__357').byteOffset + weights.getSlice('const_fold_opt__357').byteLength
+        ))
+      );
+      const const_fold_opt__452 = builder.constant(
+        { dataType: 'float32', shape: [56,48,1,1] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__452').byteOffset,
+          weights.getSlice('const_fold_opt__452').byteOffset + weights.getSlice('const_fold_opt__452').byteLength
+        ))
+      );
+      const const_fold_opt__379 = builder.constant(
+        { dataType: 'float32', shape: [56] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__379').byteOffset,
+          weights.getSlice('const_fold_opt__379').byteOffset + weights.getSlice('const_fold_opt__379').byteLength
+        ))
+      );
+      const const_fold_opt__423 = builder.constant(
+        { dataType: 'float32', shape: [64,56,1,1] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__423').byteOffset,
+          weights.getSlice('const_fold_opt__423').byteOffset + weights.getSlice('const_fold_opt__423').byteLength
+        ))
+      );
+      const const_fold_opt__399 = builder.constant(
+        { dataType: 'float32', shape: [64] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__399').byteOffset,
+          weights.getSlice('const_fold_opt__399').byteOffset + weights.getSlice('const_fold_opt__399').byteLength
+        ))
+      );
+      const const_fold_opt__449 = builder.constant(
+        { dataType: 'float32', shape: [64,1,3,3] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__449').byteOffset,
+          weights.getSlice('const_fold_opt__449').byteOffset + weights.getSlice('const_fold_opt__449').byteLength
+        ))
+      );
+      const const_fold_opt__320 = builder.constant(
+        { dataType: 'float32', shape: [64] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__320').byteOffset,
+          weights.getSlice('const_fold_opt__320').byteOffset + weights.getSlice('const_fold_opt__320').byteLength
+        ))
+      );
+      const const_fold_opt__456 = builder.constant(
+        { dataType: 'float32', shape: [72,64,1,1] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__456').byteOffset,
+          weights.getSlice('const_fold_opt__456').byteOffset + weights.getSlice('const_fold_opt__456').byteLength
+        ))
+      );
+      const const_fold_opt__333 = builder.constant(
+        { dataType: 'float32', shape: [72] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__333').byteOffset,
+          weights.getSlice('const_fold_opt__333').byteOffset + weights.getSlice('const_fold_opt__333').byteLength
+        ))
+      );
+      const const_fold_opt__459 = builder.constant(
+        { dataType: 'float32', shape: [72,1,3,3] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__459').byteOffset,
+          weights.getSlice('const_fold_opt__459').byteOffset + weights.getSlice('const_fold_opt__459').byteLength
+        ))
+      );
+      const const_fold_opt__352 = builder.constant(
+        { dataType: 'float32', shape: [72] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__352').byteOffset,
+          weights.getSlice('const_fold_opt__352').byteOffset + weights.getSlice('const_fold_opt__352').byteLength
+        ))
+      );
+      const const_fold_opt__457 = builder.constant(
+        { dataType: 'float32', shape: [80,72,1,1] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__457').byteOffset,
+          weights.getSlice('const_fold_opt__457').byteOffset + weights.getSlice('const_fold_opt__457').byteLength
+        ))
+      );
+      const const_fold_opt__344 = builder.constant(
+        { dataType: 'float32', shape: [80] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__344').byteOffset,
+          weights.getSlice('const_fold_opt__344').byteOffset + weights.getSlice('const_fold_opt__344').byteLength
+        ))
+      );
+      const const_fold_opt__485 = builder.constant(
+        { dataType: 'float32', shape: [80,1,3,3] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__485').byteOffset,
+          weights.getSlice('const_fold_opt__485').byteOffset + weights.getSlice('const_fold_opt__485').byteLength
+        ))
+      );
+      const const_fold_opt__321 = builder.constant(
+        { dataType: 'float32', shape: [80] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__321').byteOffset,
+          weights.getSlice('const_fold_opt__321').byteOffset + weights.getSlice('const_fold_opt__321').byteLength
+        ))
+      );
+      const const_fold_opt__472 = builder.constant(
+        { dataType: 'float32', shape: [88,1,3,3] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__472').byteOffset,
+          weights.getSlice('const_fold_opt__472').byteOffset + weights.getSlice('const_fold_opt__472').byteLength
+        ))
+      );
+      const const_fold_opt__341 = builder.constant(
+        { dataType: 'float32', shape: [88] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__341').byteOffset,
+          weights.getSlice('const_fold_opt__341').byteOffset + weights.getSlice('const_fold_opt__341').byteLength
+        ))
+      );
+      const const_fold_opt__437 = builder.constant(
+        { dataType: 'float32', shape: [88,80,1,1] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__437').byteOffset,
+          weights.getSlice('const_fold_opt__437').byteOffset + weights.getSlice('const_fold_opt__437').byteLength
+        ))
+      );
+      const const_fold_opt__343 = builder.constant(
+        { dataType: 'float32', shape: [88] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__343').byteOffset,
+          weights.getSlice('const_fold_opt__343').byteOffset + weights.getSlice('const_fold_opt__343').byteLength
+        ))
+      );
+      const const_fold_opt__484 = builder.constant(
+        { dataType: 'float32', shape: [32,88,1,1] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__484').byteOffset,
+          weights.getSlice('const_fold_opt__484').byteOffset + weights.getSlice('const_fold_opt__484').byteLength
+        ))
+      );
+      const const_fold_opt__443 = builder.constant(
+        { dataType: 'float32', shape: [32] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__443').byteOffset,
+          weights.getSlice('const_fold_opt__443').byteOffset + weights.getSlice('const_fold_opt__443').byteLength
+        ))
+      );
+      const const_fold_opt__441 = builder.constant(
+        { dataType: 'float32', shape: [96,88,1,1] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__441').byteOffset,
+          weights.getSlice('const_fold_opt__441').byteOffset + weights.getSlice('const_fold_opt__441').byteLength
+        ))
+      );
+      const const_fold_opt__339 = builder.constant(
+        { dataType: 'float32', shape: [96] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__339').byteOffset,
+          weights.getSlice('const_fold_opt__339').byteOffset + weights.getSlice('const_fold_opt__339').byteLength
+        ))
+      );
+      const const_fold_opt__450 = builder.constant(
+        { dataType: 'float32', shape: [96,1,3,3] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__450').byteOffset,
+          weights.getSlice('const_fold_opt__450').byteOffset + weights.getSlice('const_fold_opt__450').byteLength
+        ))
+      );
+      const const_fold_opt__356 = builder.constant(
+        { dataType: 'float32', shape: [96] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__356').byteOffset,
+          weights.getSlice('const_fold_opt__356').byteOffset + weights.getSlice('const_fold_opt__356').byteLength
+        ))
+      );
+      const const_fold_opt__403 = builder.constant(
+        { dataType: 'float32', shape: [96,96,1,1] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__403').byteOffset,
+          weights.getSlice('const_fold_opt__403').byteOffset + weights.getSlice('const_fold_opt__403').byteLength
+        ))
+      );
+      const const_fold_opt__373 = builder.constant(
+        { dataType: 'float32', shape: [96] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__373').byteOffset,
+          weights.getSlice('const_fold_opt__373').byteOffset + weights.getSlice('const_fold_opt__373').byteLength
+        ))
+      );
+      const const_fold_opt__486 = builder.constant(
+        { dataType: 'float32', shape: [96,1,3,3] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__486').byteOffset,
+          weights.getSlice('const_fold_opt__486').byteOffset + weights.getSlice('const_fold_opt__486').byteLength
+        ))
+      );
+      const const_fold_opt__413 = builder.constant(
+        { dataType: 'float32', shape: [96,96,1,1] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__413').byteOffset,
+          weights.getSlice('const_fold_opt__413').byteOffset + weights.getSlice('const_fold_opt__413').byteLength
+        ))
+      );
+      const const_fold_opt__391 = builder.constant(
+        { dataType: 'float32', shape: [96] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__391').byteOffset,
+          weights.getSlice('const_fold_opt__391').byteOffset + weights.getSlice('const_fold_opt__391').byteLength
+        ))
+      );
+      const const_fold_opt__455 = builder.constant(
+        { dataType: 'float32', shape: [96,1,3,3] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__455').byteOffset,
+          weights.getSlice('const_fold_opt__455').byteOffset + weights.getSlice('const_fold_opt__455').byteLength
+        ))
+      );
+      const const_fold_opt__407 = builder.constant(
+        { dataType: 'float32', shape: [96,96,1,1] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__407').byteOffset,
+          weights.getSlice('const_fold_opt__407').byteOffset + weights.getSlice('const_fold_opt__407').byteLength
+        ))
+      );
+      const const_fold_opt__477 = builder.constant(
+        { dataType: 'float32', shape: [96] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__477').byteOffset,
+          weights.getSlice('const_fold_opt__477').byteOffset + weights.getSlice('const_fold_opt__477').byteLength
+        ))
+      );
+      const const_fold_opt__470 = builder.constant(
+        { dataType: 'float32', shape: [96,1,3,3] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__470').byteOffset,
+          weights.getSlice('const_fold_opt__470').byteOffset + weights.getSlice('const_fold_opt__470').byteLength
+        ))
+      );
+      const const_fold_opt__444 = builder.constant(
+        { dataType: 'float32', shape: [96,96,1,1] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__444').byteOffset,
+          weights.getSlice('const_fold_opt__444').byteOffset + weights.getSlice('const_fold_opt__444').byteLength
+        ))
+      );
+      const const_fold_opt__368 = builder.constant(
+        { dataType: 'float32', shape: [96] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__368').byteOffset,
+          weights.getSlice('const_fold_opt__368').byteOffset + weights.getSlice('const_fold_opt__368').byteLength
+        ))
+      );
+      const const_fold_opt__475 = builder.constant(
+        { dataType: 'float32', shape: [96,96,1,1] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__475').byteOffset,
+          weights.getSlice('const_fold_opt__475').byteOffset + weights.getSlice('const_fold_opt__475').byteLength
+        ))
+      );
+      const const_fold_opt__328 = builder.constant(
+        { dataType: 'float32', shape: [96] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__328').byteOffset,
+          weights.getSlice('const_fold_opt__328').byteOffset + weights.getSlice('const_fold_opt__328').byteLength
+        ))
+      );
+      const const_fold_opt__469 = builder.constant(
+        { dataType: 'float32', shape: [2,88,1,1] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__469').byteOffset,
+          weights.getSlice('const_fold_opt__469').byteOffset + weights.getSlice('const_fold_opt__469').byteLength
+        ))
+      );
+      const const_fold_opt__327 = builder.constant(
+        { dataType: 'float32', shape: [2] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__327').byteOffset,
+          weights.getSlice('const_fold_opt__327').byteOffset + weights.getSlice('const_fold_opt__327').byteLength
+        ))
+      );
+      const const_fold_opt__411 = builder.constant(
+        { dataType: 'float32', shape: [6,96,1,1] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__411').byteOffset,
+          weights.getSlice('const_fold_opt__411').byteOffset + weights.getSlice('const_fold_opt__411').byteLength
+        ))
+      );
+      const const_fold_opt__380 = builder.constant(
+        { dataType: 'float32', shape: [6] },
+        new Float32Array(weights.buffer.slice(
+          weights.getSlice('const_fold_opt__380').byteOffset,
+          weights.getSlice('const_fold_opt__380').byteOffset + weights.getSlice('const_fold_opt__380').byteLength
+        ))
+      );
+
+      // Graph operations
+      const conv2d__48_0 = builder.transpose(input, { permutation: [0, 3, 1, 2] });
+      const conv2d = builder.conv2d(conv2d__48_0, const_fold_opt__408, { padding: [1, 2, 1, 2], strides: [2, 2], bias: const_fold_opt__440 });
+      const activation = builder.relu(conv2d);
+      const depthwise_conv2d = builder.conv2d(activation, const_fold_opt__479, { padding: [1, 1, 1, 1], groups: 24, bias: const_fold_opt__398 });
+      const conv2d_1 = builder.conv2d(depthwise_conv2d, const_fold_opt__397, { bias: const_fold_opt__381 });
+      const add__xeno_compat__1 = builder.add(activation, conv2d_1);
+      const activation_1 = builder.relu(add__xeno_compat__1);
+      const depthwise_conv2d_1 = builder.conv2d(activation_1, const_fold_opt__483, { padding: [1, 1, 1, 1], groups: 24, bias: const_fold_opt__398 });
+      const conv2d_2 = builder.conv2d(depthwise_conv2d_1, const_fold_opt__471, { bias: const_fold_opt__330 });
+      const channel_padding = builder.pad(activation_1, [0,0,0,0], [0,4,0,0]);
+      const add_1__xeno_compat__1 = builder.add(channel_padding, conv2d_2);
+      const activation_2 = builder.relu(add_1__xeno_compat__1);
+      const max_pooling2d = builder.maxPool2d(activation_2, { windowDimensions: [2, 2], strides: [2, 2] });
+      const channel_padding_1 = builder.pad(max_pooling2d, [0,0,0,0], [0,4,0,0]);
+      const depthwise_conv2d_2 = builder.conv2d(activation_2, const_fold_opt__430, { padding: [0, 1, 0, 1], strides: [2, 2], groups: 28, bias: const_fold_opt__366 });
+      const conv2d_3 = builder.conv2d(depthwise_conv2d_2, const_fold_opt__478, { bias: const_fold_opt__347 });
+      const add_2__xeno_compat__1 = builder.add(channel_padding_1, conv2d_3);
+      const activation_3 = builder.relu(add_2__xeno_compat__1);
+      const depthwise_conv2d_3 = builder.conv2d(activation_3, const_fold_opt__447, { padding: [1, 1, 1, 1], groups: 32, bias: const_fold_opt__468 });
+      const conv2d_4 = builder.conv2d(depthwise_conv2d_3, const_fold_opt__409, { bias: const_fold_opt__385 });
+      const channel_padding_2 = builder.pad(activation_3, [0,0,0,0], [0,4,0,0]);
+      const add_3__xeno_compat__1 = builder.add(channel_padding_2, conv2d_4);
+      const activation_4 = builder.relu(add_3__xeno_compat__1);
+      const depthwise_conv2d_4 = builder.conv2d(activation_4, const_fold_opt__458, { padding: [1, 1, 1, 1], groups: 36, bias: const_fold_opt__378 });
+      const conv2d_5 = builder.conv2d(depthwise_conv2d_4, const_fold_opt__467, { bias: const_fold_opt__322 });
+      const channel_padding_3 = builder.pad(activation_4, [0,0,0,0], [0,6,0,0]);
+      const add_4__xeno_compat__1 = builder.add(channel_padding_3, conv2d_5);
+      const activation_5 = builder.relu(add_4__xeno_compat__1);
+      const max_pooling2d_1 = builder.maxPool2d(activation_5, { windowDimensions: [2, 2], strides: [2, 2] });
+      const channel_padding_4 = builder.pad(max_pooling2d_1, [0,0,0,0], [0,6,0,0]);
+      const depthwise_conv2d_5 = builder.conv2d(activation_5, const_fold_opt__451, { padding: [0, 1, 0, 1], strides: [2, 2], groups: 42, bias: const_fold_opt__337 });
+      const conv2d_6 = builder.conv2d(depthwise_conv2d_5, const_fold_opt__415, { bias: const_fold_opt__319 });
+      const add_5__xeno_compat__1 = builder.add(channel_padding_4, conv2d_6);
+      const activation_6 = builder.relu(add_5__xeno_compat__1);
+      const depthwise_conv2d_6 = builder.conv2d(activation_6, const_fold_opt__466, { padding: [1, 1, 1, 1], groups: 48, bias: const_fold_opt__329 });
+      const conv2d_7 = builder.conv2d(depthwise_conv2d_6, const_fold_opt__452, { bias: const_fold_opt__379 });
+      const channel_padding_5 = builder.pad(activation_6, [0,0,0,0], [0,8,0,0]);
+      const add_6__xeno_compat__1 = builder.add(channel_padding_5, conv2d_7);
+      const activation_7 = builder.relu(add_6__xeno_compat__1);
+      const depthwise_conv2d_7 = builder.conv2d(activation_7, const_fold_opt__473, { padding: [1, 1, 1, 1], groups: 56, bias: const_fold_opt__357 });
+      const conv2d_8 = builder.conv2d(depthwise_conv2d_7, const_fold_opt__423, { bias: const_fold_opt__399 });
+      const channel_padding_6 = builder.pad(activation_7, [0,0,0,0], [0,8,0,0]);
+      const add_7__xeno_compat__1 = builder.add(channel_padding_6, conv2d_8);
+      const activation_8 = builder.relu(add_7__xeno_compat__1);
+      const depthwise_conv2d_8 = builder.conv2d(activation_8, const_fold_opt__449, { padding: [1, 1, 1, 1], groups: 64, bias: const_fold_opt__320 });
+      const conv2d_9 = builder.conv2d(depthwise_conv2d_8, const_fold_opt__456, { bias: const_fold_opt__333 });
+      const channel_padding_7 = builder.pad(activation_8, [0,0,0,0], [0,8,0,0]);
+      const add_8__xeno_compat__1 = builder.add(channel_padding_7, conv2d_9);
+      const activation_9 = builder.relu(add_8__xeno_compat__1);
+      const depthwise_conv2d_9 = builder.conv2d(activation_9, const_fold_opt__459, { padding: [1, 1, 1, 1], groups: 72, bias: const_fold_opt__352 });
+      const conv2d_10 = builder.conv2d(depthwise_conv2d_9, const_fold_opt__457, { bias: const_fold_opt__344 });
+      const channel_padding_8 = builder.pad(activation_9, [0,0,0,0], [0,8,0,0]);
+      const add_9__xeno_compat__1 = builder.add(channel_padding_8, conv2d_10);
+      const activation_10 = builder.relu(add_9__xeno_compat__1);
+      const depthwise_conv2d_10 = builder.conv2d(activation_10, const_fold_opt__485, { padding: [1, 1, 1, 1], groups: 80, bias: const_fold_opt__321 });
+      const conv2d_11 = builder.conv2d(depthwise_conv2d_10, const_fold_opt__437, { bias: const_fold_opt__343 });
+      const channel_padding_9 = builder.pad(activation_10, [0,0,0,0], [0,8,0,0]);
+      const add_10__xeno_compat__1 = builder.add(channel_padding_9, conv2d_11);
+      const activation_11 = builder.relu(add_10__xeno_compat__1);
+      const regressor_8 = builder.conv2d(activation_11, const_fold_opt__484, { padding: [0, 0, 0, 0], bias: const_fold_opt__443 });
+      const regressor_8__155_0 = builder.transpose(regressor_8, { permutation: [0, 2, 3, 1] });
+      const reshape_1 = builder.reshape(regressor_8__155_0, [1, 512, 16]);
+      const max_pooling2d_2 = builder.maxPool2d(activation_11, { windowDimensions: [2, 2], strides: [2, 2] });
+      const channel_padding_10 = builder.pad(max_pooling2d_2, [0,0,0,0], [0,8,0,0]);
+      const depthwise_conv2d_11 = builder.conv2d(activation_11, const_fold_opt__472, { padding: [0, 1, 0, 1], strides: [2, 2], groups: 88, bias: const_fold_opt__341 });
+      const conv2d_12 = builder.conv2d(depthwise_conv2d_11, const_fold_opt__441, { bias: const_fold_opt__339 });
+      const add_11__xeno_compat__1 = builder.add(channel_padding_10, conv2d_12);
+      const activation_12 = builder.relu(add_11__xeno_compat__1);
+      const depthwise_conv2d_12 = builder.conv2d(activation_12, const_fold_opt__450, { padding: [1, 1, 1, 1], groups: 96, bias: const_fold_opt__356 });
+      const conv2d_13 = builder.conv2d(depthwise_conv2d_12, const_fold_opt__403, { bias: const_fold_opt__373 });
+      const add_12__xeno_compat__1 = builder.add(activation_12, conv2d_13);
+      const activation_13 = builder.relu(add_12__xeno_compat__1);
+      const depthwise_conv2d_13 = builder.conv2d(activation_13, const_fold_opt__486, { padding: [1, 1, 1, 1], groups: 96, bias: const_fold_opt__356 });
+      const conv2d_14 = builder.conv2d(depthwise_conv2d_13, const_fold_opt__413, { bias: const_fold_opt__391 });
+      const add_13__xeno_compat__1 = builder.add(activation_13, conv2d_14);
+      const activation_14 = builder.relu(add_13__xeno_compat__1);
+      const depthwise_conv2d_14 = builder.conv2d(activation_14, const_fold_opt__455, { padding: [1, 1, 1, 1], groups: 96, bias: const_fold_opt__356 });
+      const conv2d_15 = builder.conv2d(depthwise_conv2d_14, const_fold_opt__407, { bias: const_fold_opt__477 });
+      const add_14__xeno_compat__1 = builder.add(activation_14, conv2d_15);
+      const activation_15 = builder.relu(add_14__xeno_compat__1);
+      const depthwise_conv2d_15 = builder.conv2d(activation_15, const_fold_opt__470, { padding: [1, 1, 1, 1], groups: 96, bias: const_fold_opt__356 });
+      const conv2d_16 = builder.conv2d(depthwise_conv2d_15, const_fold_opt__444, { bias: const_fold_opt__368 });
+      const add_15__xeno_compat__1 = builder.add(activation_15, conv2d_16);
+      const activation_16 = builder.relu(add_15__xeno_compat__1);
+      const regressor_16 = builder.conv2d(activation_16, const_fold_opt__475, { padding: [0, 0, 0, 0], bias: const_fold_opt__328 });
+      const regressor_16__202_0 = builder.transpose(regressor_16, { permutation: [0, 2, 3, 1] });
+      const reshape_3 = builder.reshape(regressor_16__202_0, [1, 384, 16]);
+      const regressors = builder.concat([reshape_1, reshape_3], 1);
+      const classificator_16 = builder.conv2d(activation_16, const_fold_opt__411, { padding: [0, 0, 0, 0], bias: const_fold_opt__380 });
+      const classificator_16__206_0 = builder.transpose(classificator_16, { permutation: [0, 2, 3, 1] });
+      const reshape_2 = builder.reshape(classificator_16__206_0, [1, 384, 1]);
+      const classificator_8 = builder.conv2d(activation_11, const_fold_opt__469, { padding: [0, 0, 0, 0], bias: const_fold_opt__327 });
+      const classificator_8__210_0 = builder.transpose(classificator_8, { permutation: [0, 2, 3, 1] });
+      const reshape = builder.reshape(classificator_8__210_0, [1, 512, 1]);
+      const classificators = builder.concat([reshape, reshape_2], 1);
+
+      const namedOutputs = {};
+      namedOutputs['regressors'] = regressors;
+      namedOutputs['classificators'] = classificators;
+      const outputShapes = {};
+      for (const [name, operand] of Object.entries(namedOutputs)) {
+        outputShapes[name] = Array.from(operand.shape);
+      }
+      return { graph: await builder.build(namedOutputs), outputShapes };
+    }
+
+    // ============ IMAGE PREPROCESSING ============
+    function preprocessImage(imageElement) {
+      const originalWidth = imageElement.naturalWidth;
+      const originalHeight = imageElement.naturalHeight;
+      const targetWidth = 128;
+      const targetHeight = 128;
+
+      const aspectRatio = originalWidth / originalHeight;
+      const targetAspectRatio = targetWidth / targetHeight;
+
+      let scale, padX = 0, padY = 0;
+      let canvasWidth, canvasHeight;
+
+      if (aspectRatio > targetAspectRatio) {
+        scale = targetWidth / originalWidth;
+        canvasHeight = Math.round(originalHeight * scale);
+        canvasWidth = targetWidth;
+        padY = (targetHeight - canvasHeight) / 2 / targetHeight;
+      } else {
+        scale = targetHeight / originalHeight;
+        canvasWidth = Math.round(originalWidth * scale);
+        canvasHeight = targetHeight;
+        padX = (targetWidth - canvasWidth) / 2 / targetWidth;
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, targetWidth, targetHeight);
+
+      const drawWidth = Math.round(canvasWidth);
+      const drawHeight = Math.round(canvasHeight);
+      const drawX = Math.round((targetWidth - drawWidth) / 2);
+      const drawY = Math.round((targetHeight - drawHeight) / 2);
+
+      ctx.drawImage(imageElement, drawX, drawY, drawWidth, drawHeight);
+
+      const imageData = ctx.getImageData(0, 0, targetWidth, targetHeight);
+      const data = imageData.data;
+      const tensor = new Float32Array(targetHeight * targetWidth * 3);
+
+      for (let i = 0; i < targetHeight * targetWidth; i++) {
+        const r = data[i * 4] / 255;
+        const g = data[i * 4 + 1] / 255;
+        const b = data[i * 4 + 2] / 255;
+        tensor[i * 3] = r * 2 - 1;
+        tensor[i * 3 + 1] = g * 2 - 1;
+        tensor[i * 3 + 2] = b * 2 - 1;
+      }
+
+      return { tensor, padding: [padX, padY, padX, padY], originalSize: [originalWidth, originalHeight] };
+    }
+
+    // ============ ANCHOR GENERATION ============
+    function generateAnchors(opts) {
+      const anchors = [];
+      const numLayers = opts.num_layers;
+      const strides = opts.strides;
+      const inputHeight = opts.input_size_height;
+      const inputWidth = opts.input_size_width;
+      const anchorOffsetX = opts.anchor_offset_x;
+      const anchorOffsetY = opts.anchor_offset_y;
+      const interpolatedScaleAspectRatio = opts.interpolated_scale_aspect_ratio;
+
+      let layerId = 0;
+      while (layerId < numLayers) {
+        let lastSameStrideLayer = layerId;
+        let repeats = 0;
+        while (lastSameStrideLayer < numLayers &&
+               strides[lastSameStrideLayer] === strides[layerId]) {
+          lastSameStrideLayer++;
+          repeats += interpolatedScaleAspectRatio === 1.0 ? 2 : 1;
+        }
+        const stride = strides[layerId];
+        const featureMapHeight = Math.floor(inputHeight / stride);
+        const featureMapWidth = Math.floor(inputWidth / stride);
+
+        for (let y = 0; y < featureMapHeight; y++) {
+          const yCenter = (y + anchorOffsetY) / featureMapHeight;
+          for (let x = 0; x < featureMapWidth; x++) {
+            const xCenter = (x + anchorOffsetX) / featureMapWidth;
+            for (let r = 0; r < repeats; r++) {
+              anchors.push([xCenter, yCenter]);
+            }
+          }
+        }
+        layerId = lastSameStrideLayer;
+      }
+      return anchors;
+    }
+
+    // ============ BOX DECODING ============
+    function decodeBoxes(rawBoxes, anchors, inputSize) {
+      const scale = inputSize.width;
+      const numAnchors = anchors.length;
+      const numPoints = rawBoxes.length / numAnchors / 2;
+      const boxes = [];
+
+      for (let i = 0; i < numAnchors; i++) {
+        const rawBox = [];
+        for (let j = 0; j < numPoints * 2; j++) {
+          rawBox.push(rawBoxes[i * numPoints * 2 + j]);
+        }
+
+        const scaled = rawBox.map(v => v / scale);
+        const xCenter = scaled[0] + anchors[i][0];
+        const yCenter = scaled[1] + anchors[i][1];
+        const w = scaled[2];
+        const h = scaled[3];
+
+        for (let k = 2; k < numPoints; k++) {
+          scaled[k * 2] += anchors[i][0];
+          scaled[k * 2 + 1] += anchors[i][1];
+        }
+
+        const xmin = xCenter - w / 2;
+        const ymin = yCenter - h / 2;
+        const xmax = xCenter + w / 2;
+        const ymax = yCenter + h / 2;
+
+        const box = [[xmin, ymin], [xmax, ymax]];
+        for (let k = 2; k < numPoints; k++) {
+          box.push([scaled[k * 2], scaled[k * 2 + 1]]);
+        }
+        boxes.push(box);
+      }
+      return boxes;
+    }
+
+    // ============ SCORING ============
+    function getSigmoidScores(rawScores) {
+      const scores = [];
+      for (let i = 0; i < rawScores.length; i++) {
+        let score = rawScores[i];
+        if (score < -RAW_SCORE_LIMIT) score = -RAW_SCORE_LIMIT;
+        if (score > RAW_SCORE_LIMIT) score = RAW_SCORE_LIMIT;
+        scores.push(1 / (1 + Math.exp(-score)));
+      }
+      return scores;
+    }
+
+    // ============ DETECTION CONVERSION ============
+    function convertToDetections(boxes, scores, minScore) {
+      const detections = [];
+      for (let i = 0; i < scores.length; i++) {
+        if (scores[i] > minScore) {
+          const box = boxes[i];
+          if (box[1][0] > box[0][0] && box[1][1] > box[0][1]) {
+            detections.push({ data: box, score: scores[i] });
+          }
+        }
+      }
+      return detections;
+    }
+
+    // ============ IoU & NMS ============
+    function computeIoU(axmin, aymin, axmax, aymax, bxmin, bymin, bxmax, bymax) {
+      const interXmin = Math.max(axmin, bxmin);
+      const interYmin = Math.max(aymin, bymin);
+      const interXmax = Math.min(axmax, bxmax);
+      const interYmax = Math.min(aymax, bymax);
+      if (interXmax < interXmin || interYmax < interYmin) return 0;
+      const interArea = (interXmax - interXmin) * (interYmax - interYmin);
+      const box1Area = (axmax - axmin) * (aymax - aymin);
+      const box2Area = (bxmax - bxmin) * (bymax - bymin);
+      return interArea / (box1Area + box2Area - interArea);
+    }
+
+    function nonMaxSuppression(detections, minSuppressionThreshold) {
+      if (detections.length === 0) return [];
+      const sorted = [...detections].sort((a, b) => b.score - a.score);
+      const keep = [];
+      while (sorted.length > 0) {
+        const current = sorted.shift();
+        keep.push(current);
+        const remaining = [];
+        for (const d of sorted) {
+          const iou = computeIoU(
+            current.data[0][0], current.data[0][1], current.data[1][0], current.data[1][1],
+            d.data[0][0], d.data[0][1], d.data[1][0], d.data[1][1]
+          );
+          if (iou < minSuppressionThreshold) remaining.push(d);
+        }
+        sorted.length = 0;
+        sorted.push(...remaining);
+      }
+      return keep;
+    }
+
+    // ============ LETTERBOX REMOVAL ============
+    function removeLetterboxPadding(detections, padding) {
+      const [padLeft, padTop, padRight, padBottom] = padding;
+      const hScale = 1 - (padLeft + padRight);
+      const vScale = 1 - (padTop + padBottom);
+      return detections.map(d => ({
+        data: d.data.map(point => [(point[0] - padLeft) / hScale, (point[1] - padTop) / vScale]),
+        score: d.score
+      }));
+    }
+
+    // ============ DRAWING ============
+    function drawDetections(overlayEl, detections, imgWidth, imgHeight) {
+      const KEYPOINT_COLORS = ['#FF0000', '#FF0000', '#00AA00', '#0000FF', '#FF8800', '#FF8800'];
+      for (const det of detections) {
+        const [xmin, ymin] = det.data[0];
+        const [xmax, ymax] = det.data[1];
+
+        const leftPct = (xmin * 100).toFixed(2) + '%';
+        const topPct = (ymin * 100).toFixed(2) + '%';
+        const wPct = ((xmax - xmin) * 100).toFixed(2) + '%';
+        const hPct = ((ymax - ymin) * 100).toFixed(2) + '%';
+
+        const boxEl = document.createElement('div');
+        boxEl.className = 'det-box';
+        boxEl.style.left = leftPct;
+        boxEl.style.top = topPct;
+        boxEl.style.width = wPct;
+        boxEl.style.height = hPct;
+        overlayEl.appendChild(boxEl);
+
+        const labelEl = document.createElement('div');
+        labelEl.className = 'det-label';
+        labelEl.style.left = leftPct;
+        labelEl.style.top = 'calc(' + topPct + ' - 18px)';
+        labelEl.textContent = (det.score * 100).toFixed(1) + '%';
+        overlayEl.appendChild(labelEl);
+
+        for (let k = 0; k < 6; k++) {
+          const kp = det.data[k + 2];
+          const kxPct = (kp[0] * 100).toFixed(2) + '%';
+          const kyPct = (kp[1] * 100).toFixed(2) + '%';
+
+          const kpEl = document.createElement('div');
+          kpEl.className = 'keypoint';
+          kpEl.style.left = kxPct;
+          kpEl.style.top = kyPct;
+          kpEl.style.backgroundColor = KEYPOINT_COLORS[k];
+          overlayEl.appendChild(kpEl);
+        }
+      }
+    }
+
+    // ============ MAIN FLOW ============
+    async function runDetection() {
+      const statusEl = document.getElementById('status');
+      const runBtn = document.getElementById('runBtn');
+      const imageEl = document.getElementById('image');
+      const overlayEl = document.getElementById('overlay');
+      const resultsCard = document.getElementById('resultsCard');
+      const resultsEl = document.getElementById('results');
+      const deviceType = document.getElementById('deviceSelect').value;
+
+      try {
+        runBtn.disabled = true;
+        resultsCard.style.display = 'none';
+        statusEl.className = 'status info';
+        statusEl.textContent = 'Checking WebNN support...';
+
+        if (!navigator.ml) {
+          throw new Error('WebNN is not supported. Use Chrome 147+ with WebNN flags enabled.');
+        }
+
+        if (!imageEl.complete) {
+          statusEl.textContent = 'Waiting for image to load...';
+          await new Promise(resolve => { imageEl.onload = resolve; });
+        }
+
+        const r1 = imageEl.getBoundingClientRect();
+        overlayEl.style.width = r1.width + 'px';
+        overlayEl.style.height = r1.height + 'px';
+        overlayEl.innerHTML = '';
+
+        statusEl.textContent = 'Creating context (' + deviceType.toUpperCase() + ')...';
+        const context = await navigator.ml.createContext({ deviceType });
+
+        statusEl.textContent = 'Loading weights...';
+        const weights = await WeightsFile.load(
+          '../face_detector-webnn/face_detector.weights',
+          '../face_detector-webnn/face_detector.manifest.json'
+        );
+
+        statusEl.textContent = 'Building graph...';
+        const buildStart = performance.now();
+        const graphResult = await buildGraph(context, weights);
+        const buildTime = (performance.now() - buildStart).toFixed(2);
+
+        statusEl.textContent = 'Preprocessing image...';
+        const { tensor, padding, originalSize } = preprocessImage(imageEl);
+        const [imgWidth, imgHeight] = originalSize;
+
+        statusEl.textContent = 'Running WebNN inference...';
+        const inputTensor = await context.createTensor({
+          dataType: 'float32', shape: [1, 128, 128, 3], writable: true
+        });
+        context.writeTensor(inputTensor, tensor);
+
+        const outputRegressorTensor = await context.createTensor({
+          dataType: 'float32', shape: graphResult.outputShapes['regressors'], readable: true
+        });
+        const outputClassTensor = await context.createTensor({
+          dataType: 'float32', shape: graphResult.outputShapes['classificators'], readable: true
+        });
+
+        const inferStart = performance.now();
+        context.dispatch(graphResult.graph, {
+          'input': inputTensor
+        }, {
+          'regressors': outputRegressorTensor,
+          'classificators': outputClassTensor
+        });
+
+        const regressors = new Float32Array(await context.readTensor(outputRegressorTensor));
+        const classificators = new Float32Array(await context.readTensor(outputClassTensor));
+        const inferTime = (performance.now() - inferStart).toFixed(2);
+
+        statusEl.textContent = 'Post-processing results...';
+        const anchors = generateAnchors(SSD_OPTIONS_SHORT);
+        const inputSize = { width: 128, height: 128 };
+        const boxes = decodeBoxes(regressors, anchors, inputSize);
+        const scores = getSigmoidScores(classificators);
+        let detections = convertToDetections(boxes, scores, MIN_SCORE);
+        detections = nonMaxSuppression(detections, MIN_SUPPRESSION_THRESHOLD);
+        detections = removeLetterboxPadding(detections, padding);
+
+        const r2 = imageEl.getBoundingClientRect();
+        overlayEl.style.width = r2.width + 'px';
+        overlayEl.style.height = r2.height + 'px';
+
+        if (detections.length > 0) {
+          drawDetections(overlayEl, detections, imgWidth, imgHeight);
+        }
+
+        statusEl.className = 'status success';
+        statusEl.textContent = 'Build: ' + buildTime + 'ms | Inference: ' + inferTime + 'ms | Found ' + detections.length + ' face(s) on ' + deviceType.toUpperCase();
+
+        resultsCard.style.display = 'block';
+        let html = '';
+
+        html += '<div class="section-label">Detections</div>';
+        if (detections.length > 0) {
+          html += '<table><tr><th>#</th><th>Score</th><th>xmin</th><th>ymin</th><th>xmax</th><th>ymax</th></tr>';
+          for (let i = 0; i < detections.length; i++) {
+            const d = detections[i];
+            html += '<tr><td>' + (i+1) + '</td><td>' + (d.score*100).toFixed(1) + '%</td>' +
+              '<td>' + d.data[0][0].toFixed(3) + '</td><td>' + d.data[0][1].toFixed(3) + '</td>' +
+              '<td>' + d.data[1][0].toFixed(3) + '</td><td>' + d.data[1][1].toFixed(3) + '</td></tr>';
+          }
+          html += '</table>';
+        } else {
+          html += '<p>No faces detected.</p>';
+        }
+
+        html += '<div class="section-label">Timing</div>';
+        html += '<table><tr><th>Phase</th><th>Time</th><th>Device</th></tr>';
+        html += '<tr><td>Graph build</td><td>' + buildTime + 'ms</td><td>' + deviceType.toUpperCase() + '</td></tr>';
+        html += '<tr><td>Inference (1 run)</td><td>' + inferTime + 'ms</td><td>' + deviceType.toUpperCase() + '</td></tr>';
+        html += '</table>';
+
+        window._lastRegressors = regressors;
+        window._lastClassificators = classificators;
+
+        html += '<div class="section-label">Raw Outputs</div>';
+        html += '<div style="margin-bottom:0.5rem;">';
+        html += '<strong>regressors</strong> [1,896,16] (float32) &mdash; ' + regressors.length + ' values';
+        html += ' <button onclick="copyRawArray(\'_lastRegressors\')" style="font-size:0.7rem;padding:1px 6px;vertical-align:middle;background:#666;">copy all</button>';
+        html += '</div>';
+        html += '<pre>[' + Array.from(regressors.slice(0, 16)).map(v => v.toFixed(6)).join(', ') + (regressors.length > 16 ? ', ...' : '') + ']</pre>';
+
+        html += '<div style="margin-bottom:0.5rem;margin-top:0.75rem;">';
+        html += '<strong>classificators</strong> [1,896,1] (float32) &mdash; ' + classificators.length + ' values';
+        html += ' <button onclick="copyRawArray(\'_lastClassificators\')" style="font-size:0.7rem;padding:1px 6px;vertical-align:middle;background:#666;">copy all</button>';
+        html += '</div>';
+        html += '<pre>[' + Array.from(classificators.slice(0, 16)).map(v => v.toFixed(6)).join(', ') + (classificators.length > 16 ? ', ...' : '') + ']</pre>';
+
+        html += '<div class="section-label">Detections (' + detections.length + ' face' + (detections.length !== 1 ? 's' : '') + ')</div>';
+        if (detections.length > 0) {
+          html += '<table><thead><tr>';
+          html += '<th>#</th><th>Score</th><th>xmin</th><th>ymin</th><th>xmax</th><th>ymax</th>';
+          for (const name of KEYPOINT_NAMES) {
+            html += '<th>' + name + ' x</th><th>' + name + ' y</th>';
+          }
+          html += '</tr></thead><tbody>';
+          detections.forEach((det, idx) => {
+            html += '<tr>';
+            html += '<td>' + (idx + 1) + '</td>';
+            html += '<td>' + (det.score * 100).toFixed(1) + '%</td>';
+            html += '<td>' + det.data[0][0].toFixed(4) + '</td>';
+            html += '<td>' + det.data[0][1].toFixed(4) + '</td>';
+            html += '<td>' + det.data[1][0].toFixed(4) + '</td>';
+            html += '<td>' + det.data[1][1].toFixed(4) + '</td>';
+            for (let k = 0; k < 6; k++) {
+              html += '<td>' + det.data[k + 2][0].toFixed(4) + '</td>';
+              html += '<td>' + det.data[k + 2][1].toFixed(4) + '</td>';
+            }
+            html += '</tr>';
+          });
+          html += '</tbody></table>';
+        } else {
+          html += '<div style="color:#999;font-size:0.85rem;">No faces detected above threshold.</div>';
+        }
+
+        resultsEl.innerHTML = html;
+
+      } catch (err) {
+        statusEl.className = 'status error';
+        statusEl.textContent = 'Error: ' + err.message;
+        console.error(err);
+      } finally {
+        runBtn.disabled = false;
+      }
+    }
+
+    function copyRawArray(key) {
+      const arr = window[key];
+      if (!arr) return;
+      const json = '[' + Array.from(arr).map(v => Number(v).toFixed(6)).join(', ') + ']';
+      navigator.clipboard.writeText(json).then(() => {
+        const statusEl = document.getElementById('status');
+        statusEl.textContent = 'Copied ' + arr.length + ' values from ' + key + ' to clipboard.';
+      }).catch(() => {});
+    }
+
+    // ============ INIT ============
+    window.addEventListener('load', () => {
+      const imageInput = document.getElementById('imageInput');
+      const imageEl = document.getElementById('image');
+      const overlayEl = document.getElementById('overlay');
+      const statusEl = document.getElementById('status');
+
+      imageInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const url = URL.createObjectURL(file);
+        imageEl.src = url;
+        overlayEl.innerHTML = '';
+        statusEl.className = 'status info';
+        statusEl.textContent = 'Image loaded. Select device and click Run Detection.';
+        document.getElementById('resultsCard').style.display = 'none';
+      });
+
+      imageEl.addEventListener('load', () => {
+        requestAnimationFrame(() => {
+          const r = imageEl.getBoundingClientRect();
+          overlayEl.style.width = r.width + 'px';
+          overlayEl.style.height = r.height + 'px';
+        });
+      });
+    });
+  </script>
+</body>
+</html>

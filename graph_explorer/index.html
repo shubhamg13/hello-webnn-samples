@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Graph Explorer · face_detector</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; color: #1a1a1a; padding: 0; display:flex; height:100vh; }
+    .sidebar { width: 320px; min-width:320px; overflow-y:auto; padding:1rem; border-right:1px solid #ddd; display:flex; flex-direction:column; gap:0.75rem; }
+    .main { flex:1; overflow:auto; padding:1rem; display:flex; flex-direction:column; gap:0.75rem; }
+    h1 { font-size:1.3rem; }
+    h3 { font-size:1rem; margin-bottom:0.25rem; }
+    .subtitle { color:#666; font-size:0.85rem; }
+    .card { background:#fff; padding:0.75rem 1rem; border:1px solid #eee; }
+    .controls { display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; }
+    label { font-weight:600; font-size:0.85rem; }
+    select { padding:0.16rem 0.4rem; border:1px solid #ddd; font-size:0.85rem; }
+    button { background:rgba(0,47,167,1); color:#fff; border:none; padding:0.25rem 1rem; font-size:0.85rem; cursor:pointer; }
+    button:hover { background:rgba(0,47,167,0.85); }
+    button:disabled { background:#ccc; cursor:not-allowed; }
+    .status { padding:0.6rem; font-size:0.85rem; }
+    .status.info { background:#e3f2fd; border-left:3px solid #2196F3; }
+    .status.success { background:#e9f8f0; border-left:3px solid #068906; }
+    .status.error { background:#ffebee; border-left:3px solid #f44336; }
+    pre { margin:0.25rem 0; background:#f5f5f5; padding:0.4rem 0.8rem; overflow-x:auto; font-size:0.75rem; max-height:120px; }
+    #graphCard { overflow:auto; }
+    #graphCard svg { display:block; }
+    .graph-node { cursor:pointer; }
+    .graph-node rect { stroke-width:2; }
+    .graph-node text { font-family:system-ui,sans-serif; pointer-events:none; }
+    .graph-edge { fill:none; stroke:#999; stroke-width:1.5; }
+    .graph-edge-active { stroke:#0052cc; stroke-width:2; }
+    .node-info { font-size:0.8rem; color:#555; }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <h1>Graph Explorer</h1>
+    <p class="subtitle">face_detector · click any node to run that subgraph</p>
+
+    <div class="card">
+      <div class="controls">
+        <label>Device:</label>
+        <select id="deviceSelect">
+          <option value="cpu">CPU</option>
+          <option value="gpu">GPU</option>
+          <option value="npu">NPU</option>
+        </select>
+        <label>Input:</label>
+        <select id="fillSelect">
+          <option value="random">Random</option>
+          <option value="fixed">Fixed</option>
+          <option value="image">Image</option>
+        </select>
+        <input type="number" id="fixedValue" value="0.0" step="0.1" style="width:60px;display:none;">
+        <input type="file" id="imageInput" accept="image/*" style="display:none;">
+        <button id="imageBtn" onclick="document.getElementById('imageInput').click()" style="display:none;">Choose Image</button>
+        <button id="genBtn" onclick="generateInput()">Generate</button>
+      </div>
+      <div id="inputPreview" style="font-size:0.75rem;color:#555;background:#f5f5f5;padding:0.3rem 0.6rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">No input generated yet</div>
+      <div id="imagePreview" style="display:none;margin-top:0.4rem;text-align:center;">
+        <img id="inputImage" style="max-width:128px;max-height:128px;border:1px solid #ddd;display:none;">
+        <div id="imageInfo" style="font-size:0.7rem;color:#555;margin-top:0.15rem;"></div>
+      </div>
+      <div style="margin-top:0.5rem;">
+        <button id="runBtn" onclick="runSelected()">Run Selected</button>
+        <button id="runAllBtn" onclick="runAll()">Run All</button>
+      </div>
+    </div>
+
+    <div class="card" id="nodeCard">
+      <h3>Selected Node</h3>
+      <div id="nodeInfo" class="node-info">Click a node in the graph</div>
+    </div>
+
+    <div class="card" id="statusCard">
+      <div id="status" class="status info">Ready.</div>
+    </div>
+
+    <div class="card" id="resultsCard" style="display:none;flex:1;overflow:auto;">
+      <h3>Results</h3>
+      <div id="results"></div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="card" id="graphCard" style="flex:1;">
+      <h3>Full Graph</h3>
+      <div id="graphContainer"></div>
+    </div>
+  </div>
+
+  <script>
+class WeightsFile {
+  constructor(buffer, manifest) {
+    this.buffer = buffer;
+    this.manifest = manifest;
+  }
+  static async load(weightsPath, manifestPath) {
+    const [wRes, mRes] = await Promise.all([fetch(weightsPath), fetch(manifestPath)]);
+    if (!wRes.ok) throw new Error('Failed to load weights: ' + wRes.statusText);
+    if (!mRes.ok) throw new Error('Failed to load manifest: ' + mRes.statusText);
+    const buffer = await wRes.arrayBuffer();
+    const manifest = await mRes.json();
+    if (manifest.format !== 'wg-weights-manifest') throw new Error('Invalid manifest format');
+    const magic = new TextDecoder().decode(new Uint8Array(buffer, 0, 4));
+    if (magic !== 'WGWT') throw new Error('Invalid weights file');
+    return new WeightsFile(buffer, manifest);
+  }
+  getSlice(name) {
+    const t = this.manifest.tensors[name];
+    if (!t) throw new Error('Tensor not found: ' + name);
+    return t;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Node definition helpers
+// ---------------------------------------------------------------------------
+function N(id, type, inputs, params, weights, shape, label, detail) {
+  return { id, type, inputs, params, weights, shape, label, detail };
+}
+function W(name, shape) { return { name, shape }; }
+function shape(arr) { return arr.slice(); }
+
+// ---------------------------------------------------------------------------
+// Full graph node definitions
+// ---------------------------------------------------------------------------
+const NODES = [
+  // Input
+  N('input', 'input', [], {}, [], [1,128,128,3], 'Input', '[1,128,128,3]'),
+
+  // Prologue: transpose → conv2d(3→24) → relu
+  N('t0', 'transpose', ['input'], { permutation: [0,3,1,2] }, [], [1,3,128,128], 'Transpose', 'NHWC→NCHW'),
+  N('c0', 'conv2d', ['t0'], { padding: [1,2,1,2], strides: [2,2] }, [W('const_fold_opt__408',[24,3,5,5]), W('const_fold_opt__440',[24])], [1,24,64,64], 'Conv2D', '3→24 5×5 s2'),
+  N('a0', 'relu', ['c0'], {}, [], [1,24,64,64], 'ReLU', ''),
+
+  // Depthwise_conv2d g24 + conv2d_1 24→24
+  N('dw0', 'conv2d', ['a0'], { padding: [1,1,1,1], groups: 24 }, [W('const_fold_opt__479',[24,1,3,3]), W('const_fold_opt__398',[24])], [1,24,64,64], 'DW Conv2D', '24ch 3×3 g24'),
+  N('pw0', 'conv2d', ['dw0'], {}, [W('const_fold_opt__397',[24,24,1,1]), W('const_fold_opt__381',[24])], [1,24,64,64], 'Conv2D 1×1', '24→24'),
+  N('add0', 'add', ['a0','pw0'], {}, [], [1,24,64,64], 'Add', 'skip'),
+  N('a1', 'relu', ['add0'], {}, [], [1,24,64,64], 'ReLU', ''),
+
+  // Block 1: 24→28
+  N('dw1', 'conv2d', ['a1'], { padding: [1,1,1,1], groups: 24 }, [W('const_fold_opt__483',[24,1,3,3]), W('const_fold_opt__398',[24])], [1,24,64,64], 'DW Conv2D', '24ch 3×3 g24'),
+  N('pw1', 'conv2d', ['dw1'], {}, [W('const_fold_opt__471',[28,24,1,1]), W('const_fold_opt__330',[28])], [1,28,64,64], 'Conv2D 1×1', '24→28'),
+  N('pad1', 'pad', ['a1'], { paddingBegin: [0,0,0,0], paddingEnd: [0,4,0,0] }, [], [1,28,64,64], 'Pad', '0→4ch'),
+  N('add1', 'add', ['pad1','pw1'], {}, [], [1,28,64,64], 'Add', 'skip'),
+  N('a2', 'relu', ['add1'], {}, [], [1,28,64,64], 'ReLU', ''),
+
+  // Downsample: 28→32 (sp 64→32)
+  N('mp1', 'maxpool', ['a2'], { windowDimensions: [2,2], strides: [2,2] }, [], [1,28,32,32], 'MaxPool', '2×2 s2'),
+  N('pad_mp1', 'pad', ['mp1'], { paddingBegin: [0,0,0,0], paddingEnd: [0,4,0,0] }, [], [1,32,32,32], 'Pad', '0→4ch'),
+  N('dw2', 'conv2d', ['a2'], { padding: [0,1,0,1], strides: [2,2], groups: 28 }, [W('const_fold_opt__430',[28,1,3,3]), W('const_fold_opt__366',[28])], [1,28,32,32], 'DW Conv2D', '28ch 3×3 s2 g28'),
+  N('pw2', 'conv2d', ['dw2'], {}, [W('const_fold_opt__478',[32,28,1,1]), W('const_fold_opt__347',[32])], [1,32,32,32], 'Conv2D 1×1', '28→32'),
+  N('add2', 'add', ['pad_mp1','pw2'], {}, [], [1,32,32,32], 'Add', 'skip'),
+  N('a3', 'relu', ['add2'], {}, [], [1,32,32,32], 'ReLU', ''),
+
+  // Block 2: 32→36
+  N('dw3', 'conv2d', ['a3'], { padding: [1,1,1,1], groups: 32 }, [W('const_fold_opt__447',[32,1,3,3]), W('const_fold_opt__468',[32])], [1,32,32,32], 'DW Conv2D', '32ch 3×3 g32'),
+  N('pw3', 'conv2d', ['dw3'], {}, [W('const_fold_opt__409',[36,32,1,1]), W('const_fold_opt__385',[36])], [1,36,32,32], 'Conv2D 1×1', '32→36'),
+  N('pad3', 'pad', ['a3'], { paddingBegin: [0,0,0,0], paddingEnd: [0,4,0,0] }, [], [1,36,32,32], 'Pad', '0→4ch'),
+  N('add3', 'add', ['pad3','pw3'], {}, [], [1,36,32,32], 'Add', 'skip'),
+  N('a4', 'relu', ['add3'], {}, [], [1,36,32,32], 'ReLU', ''),
+
+  // Block 3: 36→42
+  N('dw4', 'conv2d', ['a4'], { padding: [1,1,1,1], groups: 36 }, [W('const_fold_opt__458',[36,1,3,3]), W('const_fold_opt__378',[36])], [1,36,32,32], 'DW Conv2D', '36ch 3×3 g36'),
+  N('pw4', 'conv2d', ['dw4'], {}, [W('const_fold_opt__467',[42,36,1,1]), W('const_fold_opt__322',[42])], [1,42,32,32], 'Conv2D 1×1', '36→42'),
+  N('pad4', 'pad', ['a4'], { paddingBegin: [0,0,0,0], paddingEnd: [0,6,0,0] }, [], [1,42,32,32], 'Pad', '0→6ch'),
+  N('add4', 'add', ['pad4','pw4'], {}, [], [1,42,32,32], 'Add', 'skip'),
+  N('a5', 'relu', ['add4'], {}, [], [1,42,32,32], 'ReLU', ''),
+
+  // Downsample: 42→48 (sp 32→16)
+  N('mp2', 'maxpool', ['a5'], { windowDimensions: [2,2], strides: [2,2] }, [], [1,42,16,16], 'MaxPool', '2×2 s2'),
+  N('pad_mp2', 'pad', ['mp2'], { paddingBegin: [0,0,0,0], paddingEnd: [0,6,0,0] }, [], [1,48,16,16], 'Pad', '0→6ch'),
+  N('dw5', 'conv2d', ['a5'], { padding: [0,1,0,1], strides: [2,2], groups: 42 }, [W('const_fold_opt__451',[42,1,3,3]), W('const_fold_opt__337',[42])], [1,42,16,16], 'DW Conv2D', '42ch 3×3 s2 g42'),
+  N('pw5', 'conv2d', ['dw5'], {}, [W('const_fold_opt__415',[48,42,1,1]), W('const_fold_opt__319',[48])], [1,48,16,16], 'Conv2D 1×1', '42→48'),
+  N('add5', 'add', ['pad_mp2','pw5'], {}, [], [1,48,16,16], 'Add', 'skip'),
+  N('a6', 'relu', ['add5'], {}, [], [1,48,16,16], 'ReLU', ''),
+
+  // Block 4: 48→56
+  N('dw6', 'conv2d', ['a6'], { padding: [1,1,1,1], groups: 48 }, [W('const_fold_opt__466',[48,1,3,3]), W('const_fold_opt__329',[48])], [1,48,16,16], 'DW Conv2D', '48ch 3×3 g48'),
+  N('pw6', 'conv2d', ['dw6'], {}, [W('const_fold_opt__452',[56,48,1,1]), W('const_fold_opt__379',[56])], [1,56,16,16], 'Conv2D 1×1', '48→56'),
+  N('pad6', 'pad', ['a6'], { paddingBegin: [0,0,0,0], paddingEnd: [0,8,0,0] }, [], [1,56,16,16], 'Pad', '0→8ch'),
+  N('add6', 'add', ['pad6','pw6'], {}, [], [1,56,16,16], 'Add', 'skip'),
+  N('a7', 'relu', ['add6'], {}, [], [1,56,16,16], 'ReLU', ''),
+
+  // Block 5: 56→64
+  N('dw7', 'conv2d', ['a7'], { padding: [1,1,1,1], groups: 56 }, [W('const_fold_opt__473',[56,1,3,3]), W('const_fold_opt__357',[56])], [1,56,16,16], 'DW Conv2D', '56ch 3×3 g56'),
+  N('pw7', 'conv2d', ['dw7'], {}, [W('const_fold_opt__423',[64,56,1,1]), W('const_fold_opt__399',[64])], [1,64,16,16], 'Conv2D 1×1', '56→64'),
+  N('pad7', 'pad', ['a7'], { paddingBegin: [0,0,0,0], paddingEnd: [0,8,0,0] }, [], [1,64,16,16], 'Pad', '0→8ch'),
+  N('add7', 'add', ['pad7','pw7'], {}, [], [1,64,16,16], 'Add', 'skip'),
+  N('a8', 'relu', ['add7'], {}, [], [1,64,16,16], 'ReLU', ''),
+
+  // Block 6: 64→72
+  N('dw8', 'conv2d', ['a8'], { padding: [1,1,1,1], groups: 64 }, [W('const_fold_opt__449',[64,1,3,3]), W('const_fold_opt__320',[64])], [1,64,16,16], 'DW Conv2D', '64ch 3×3 g64'),
+  N('pw8', 'conv2d', ['dw8'], {}, [W('const_fold_opt__456',[72,64,1,1]), W('const_fold_opt__333',[72])], [1,72,16,16], 'Conv2D 1×1', '64→72'),
+  N('pad8', 'pad', ['a8'], { paddingBegin: [0,0,0,0], paddingEnd: [0,8,0,0] }, [], [1,72,16,16], 'Pad', '0→8ch'),
+  N('add8', 'add', ['pad8','pw8'], {}, [], [1,72,16,16], 'Add', 'skip'),
+  N('a9', 'relu', ['add8'], {}, [], [1,72,16,16], 'ReLU', ''),
+
+  // Block 7: 72→80
+  N('dw9', 'conv2d', ['a9'], { padding: [1,1,1,1], groups: 72 }, [W('const_fold_opt__459',[72,1,3,3]), W('const_fold_opt__352',[72])], [1,72,16,16], 'DW Conv2D', '72ch 3×3 g72'),
+  N('pw9', 'conv2d', ['dw9'], {}, [W('const_fold_opt__457',[80,72,1,1]), W('const_fold_opt__344',[80])], [1,80,16,16], 'Conv2D 1×1', '72→80'),
+  N('pad9', 'pad', ['a9'], { paddingBegin: [0,0,0,0], paddingEnd: [0,8,0,0] }, [], [1,80,16,16], 'Pad', '0→8ch'),
+  N('add9', 'add', ['pad9','pw9'], {}, [], [1,80,16,16], 'Add', 'skip'),
+  N('a10', 'relu', ['add9'], {}, [], [1,80,16,16], 'ReLU', ''),
+
+  // Block 8: 80→88
+  N('dw10', 'conv2d', ['a10'], { padding: [1,1,1,1], groups: 80 }, [W('const_fold_opt__485',[80,1,3,3]), W('const_fold_opt__321',[80])], [1,80,16,16], 'DW Conv2D', '80ch 3×3 g80'),
+  N('pw10', 'conv2d', ['dw10'], {}, [W('const_fold_opt__437',[88,80,1,1]), W('const_fold_opt__343',[88])], [1,88,16,16], 'Conv2D 1×1', '80→88'),
+  N('pad10', 'pad', ['a10'], { paddingBegin: [0,0,0,0], paddingEnd: [0,8,0,0] }, [], [1,88,16,16], 'Pad', '0→8ch'),
+  N('add10', 'add', ['pad10','pw10'], {}, [], [1,88,16,16], 'Add', 'skip'),
+  N('a11', 'relu', ['add10'], {}, [], [1,88,16,16], 'ReLU', ''),
+
+  // Output regressor_8 from a11: conv2d 88→32 → NHWC → reshape
+  N('r8', 'conv2d', ['a11'], {}, [W('const_fold_opt__484',[32,88,1,1]), W('const_fold_opt__443',[32])], [1,32,16,16], 'Conv2D 1×1', '88→32'),
+  N('r8_t', 'transpose', ['r8'], { permutation: [0,2,3,1] }, [], [1,16,16,32], 'Transpose', 'NCHW→NHWC'),
+  N('r8_r', 'reshape', ['r8_t'], { shape: [1,512,16] }, [], [1,512,16], 'Reshape', 'regressor_8'),
+
+  // Downsample from a11: 88→96 (sp 16→8)
+  N('mp3', 'maxpool', ['a11'], { windowDimensions: [2,2], strides: [2,2] }, [], [1,88,8,8], 'MaxPool', '2×2 s2'),
+  N('pad_mp3', 'pad', ['mp3'], { paddingBegin: [0,0,0,0], paddingEnd: [0,8,0,0] }, [], [1,96,8,8], 'Pad', '0→8ch'),
+  N('dw11', 'conv2d', ['a11'], { padding: [0,1,0,1], strides: [2,2], groups: 88 }, [W('const_fold_opt__472',[88,1,3,3]), W('const_fold_opt__341',[88])], [1,88,8,8], 'DW Conv2D', '88ch 3×3 s2 g88'),
+  N('pw11', 'conv2d', ['dw11'], {}, [W('const_fold_opt__441',[96,88,1,1]), W('const_fold_opt__339',[96])], [1,96,8,8], 'Conv2D 1×1', '88→96'),
+  N('add11', 'add', ['pad_mp3','pw11'], {}, [], [1,96,8,8], 'Add', 'skip'),
+  N('a12', 'relu', ['add11'], {}, [], [1,96,8,8], 'ReLU', ''),
+
+  // Block 9: 96→96 (identity)
+  N('dw12', 'conv2d', ['a12'], { padding: [1,1,1,1], groups: 96 }, [W('const_fold_opt__450',[96,1,3,3]), W('const_fold_opt__356',[96])], [1,96,8,8], 'DW Conv2D', '96ch 3×3 g96'),
+  N('pw12', 'conv2d', ['dw12'], {}, [W('const_fold_opt__403',[96,96,1,1]), W('const_fold_opt__373',[96])], [1,96,8,8], 'Conv2D 1×1', '96→96'),
+  N('add12', 'add', ['a12','pw12'], {}, [], [1,96,8,8], 'Add', 'skip'),
+  N('a13', 'relu', ['add12'], {}, [], [1,96,8,8], 'ReLU', ''),
+
+  // Block 10: 96→96
+  N('dw13', 'conv2d', ['a13'], { padding: [1,1,1,1], groups: 96 }, [W('const_fold_opt__486',[96,1,3,3]), W('const_fold_opt__356',[96])], [1,96,8,8], 'DW Conv2D', '96ch 3×3 g96'),
+  N('pw13', 'conv2d', ['dw13'], {}, [W('const_fold_opt__413',[96,96,1,1]), W('const_fold_opt__391',[96])], [1,96,8,8], 'Conv2D 1×1', '96→96'),
+  N('add13', 'add', ['a13','pw13'], {}, [], [1,96,8,8], 'Add', 'skip'),
+  N('a14', 'relu', ['add13'], {}, [], [1,96,8,8], 'ReLU', ''),
+
+  // Block 11: 96→96
+  N('dw14', 'conv2d', ['a14'], { padding: [1,1,1,1], groups: 96 }, [W('const_fold_opt__455',[96,1,3,3]), W('const_fold_opt__356',[96])], [1,96,8,8], 'DW Conv2D', '96ch 3×3 g96'),
+  N('pw14', 'conv2d', ['dw14'], {}, [W('const_fold_opt__407',[96,96,1,1]), W('const_fold_opt__477',[96])], [1,96,8,8], 'Conv2D 1×1', '96→96'),
+  N('add14', 'add', ['a14','pw14'], {}, [], [1,96,8,8], 'Add', 'skip'),
+  N('a15', 'relu', ['add14'], {}, [], [1,96,8,8], 'ReLU', ''),
+
+  // Block 12: 96→96
+  N('dw15', 'conv2d', ['a15'], { padding: [1,1,1,1], groups: 96 }, [W('const_fold_opt__470',[96,1,3,3]), W('const_fold_opt__356',[96])], [1,96,8,8], 'DW Conv2D', '96ch 3×3 g96'),
+  N('pw15', 'conv2d', ['dw15'], {}, [W('const_fold_opt__444',[96,96,1,1]), W('const_fold_opt__368',[96])], [1,96,8,8], 'Conv2D 1×1', '96→96'),
+  N('add15', 'add', ['a15','pw15'], {}, [], [1,96,8,8], 'Add', 'skip'),
+  N('a16', 'relu', ['add15'], {}, [], [1,96,8,8], 'ReLU', ''),
+
+  // Output regressor_16 from a16: conv2d 96→96 → NHWC → reshape
+  N('r16', 'conv2d', ['a16'], {}, [W('const_fold_opt__475',[96,96,1,1]), W('const_fold_opt__328',[96])], [1,96,8,8], 'Conv2D 1×1', '96→96'),
+  N('r16_t', 'transpose', ['r16'], { permutation: [0,2,3,1] }, [], [1,8,8,96], 'Transpose', 'NCHW→NHWC'),
+  N('r16_r', 'reshape', ['r16_t'], { shape: [1,384,16] }, [], [1,384,16], 'Reshape', 'regressor_16'),
+  N('regressors', 'concat', ['r8_r','r16_r'], { axis: 1 }, [], [1,896,16], 'Concat', 'regressors'),
+
+  // Output classificator_16 from a16: conv2d 96→6 → NHWC → reshape
+  N('c16', 'conv2d', ['a16'], {}, [W('const_fold_opt__411',[6,96,1,1]), W('const_fold_opt__380',[6])], [1,6,8,8], 'Conv2D 1×1', '96→6'),
+  N('c16_t', 'transpose', ['c16'], { permutation: [0,2,3,1] }, [], [1,8,8,6], 'Transpose', 'NCHW→NHWC'),
+  N('c16_r', 'reshape', ['c16_t'], { shape: [1,384,1] }, [], [1,384,1], 'Reshape', 'classificator_16'),
+
+  // Output classificator_8 from a11: conv2d 88→2 → NHWC → reshape
+  N('c8', 'conv2d', ['a11'], {}, [W('const_fold_opt__469',[2,88,1,1]), W('const_fold_opt__327',[2])], [1,2,16,16], 'Conv2D 1×1', '88→2'),
+  N('c8_t', 'transpose', ['c8'], { permutation: [0,2,3,1] }, [], [1,16,16,2], 'Transpose', 'NCHW→NHWC'),
+  N('c8_r', 'reshape', ['c8_t'], { shape: [1,512,1] }, [], [1,512,1], 'Reshape', 'classificator_8'),
+  N('classificators', 'concat', ['c8_r','c16_r'], { axis: 1 }, [], [1,896,1], 'Concat', 'classificators'),
+];
+
+// Build node map
+const NODE_MAP = {};
+for (const n of NODES) NODE_MAP[n.id] = n;
+
+// Edge list from node inputs
+function buildEdges() {
+  const edges = [];
+  for (const n of NODES) {
+    for (const inp of n.inputs) {
+      if (NODE_MAP[inp]) edges.push({ from: inp, to: n.id });
+    }
+  }
+  return edges;
+}
+const GRAPH_EDGES = buildEdges();
+
+// Reference variable names from face_detector.js
+const REF_NAMES = {
+  t0:'conv2d__48_0', c0:'conv2d', a0:'activation', dw0:'depthwise_conv2d',
+  pw0:'conv2d_1', add0:'add__xeno_compat__1', a1:'activation_1',
+  dw1:'depthwise_conv2d_1', pw1:'conv2d_2', pad1:'channel_padding',
+  add1:'add_1__xeno_compat__1', a2:'activation_2', mp1:'max_pooling2d',
+  pad_mp1:'channel_padding_1', dw2:'depthwise_conv2d_2', pw2:'conv2d_3',
+  add2:'add_2__xeno_compat__1', a3:'activation_3',
+  dw3:'depthwise_conv2d_3', pw3:'conv2d_4', pad3:'channel_padding_2',
+  add3:'add_3__xeno_compat__1', a4:'activation_4',
+  dw4:'depthwise_conv2d_4', pw4:'conv2d_5', pad4:'channel_padding_3',
+  add4:'add_4__xeno_compat__1', a5:'activation_5', mp2:'max_pooling2d_1',
+  pad_mp2:'channel_padding_4', dw5:'depthwise_conv2d_5', pw5:'conv2d_6',
+  add5:'add_5__xeno_compat__1', a6:'activation_6',
+  dw6:'depthwise_conv2d_6', pw6:'conv2d_7', pad6:'channel_padding_5',
+  add6:'add_6__xeno_compat__1', a7:'activation_7',
+  dw7:'depthwise_conv2d_7', pw7:'conv2d_8', pad7:'channel_padding_6',
+  add7:'add_7__xeno_compat__1', a8:'activation_8',
+  dw8:'depthwise_conv2d_8', pw8:'conv2d_9', pad8:'channel_padding_7',
+  add8:'add_8__xeno_compat__1', a9:'activation_9',
+  dw9:'depthwise_conv2d_9', pw9:'conv2d_10', pad9:'channel_padding_8',
+  add9:'add_9__xeno_compat__1', a10:'activation_10',
+  dw10:'depthwise_conv2d_10', pw10:'conv2d_11', pad10:'channel_padding_9',
+  add10:'add_10__xeno_compat__1', a11:'activation_11',
+  r8:'regressor_8', r8_t:'regressor_8__155_0', r8_r:'reshape_1',
+  mp3:'max_pooling2d_2', pad_mp3:'channel_padding_10',
+  dw11:'depthwise_conv2d_11', pw11:'conv2d_12',
+  add11:'add_11__xeno_compat__1', a12:'activation_12',
+  dw12:'depthwise_conv2d_12', pw12:'conv2d_13',
+  add12:'add_12__xeno_compat__1', a13:'activation_13',
+  dw13:'depthwise_conv2d_13', pw13:'conv2d_14',
+  add13:'add_13__xeno_compat__1', a14:'activation_14',
+  dw14:'depthwise_conv2d_14', pw14:'conv2d_15',
+  add14:'add_14__xeno_compat__1', a15:'activation_15',
+  dw15:'depthwise_conv2d_15', pw15:'conv2d_16',
+  add15:'add_15__xeno_compat__1', a16:'activation_16',
+  r16:'regressor_16', r16_t:'regressor_16__202_0', r16_r:'reshape_3',
+  regressors:'regressors',
+  c16:'classificator_16', c16_t:'classificator_16__206_0', c16_r:'reshape_2',
+  c8:'classificator_8', c8_t:'classificator_8__210_0', c8_r:'reshape',
+  classificators:'classificators'
+};
+
+// ---------------------------------------------------------------------------
+// Graph layout and rendering
+// ---------------------------------------------------------------------------
+const OP_COLORS = {
+  input:   { fill: '#dbeafe', stroke: '#3b82f6', text: '#1e40af' },
+  transpose: { fill: '#ede9fe', stroke: '#8b5cf6', text: '#5b21b6' },
+  conv2d:  { fill: '#ffedd5', stroke: '#f97316', text: '#9a3412' },
+  relu:    { fill: '#d1fae5', stroke: '#10b981', text: '#065f46' },
+  add:     { fill: '#dbeafe', stroke: '#3b82f6', text: '#1e40af' },
+  pad:     { fill: '#f3f4f6', stroke: '#9ca3af', text: '#4b5563' },
+  maxpool: { fill: '#ccfbf1', stroke: '#14b8a6', text: '#115e59' },
+  reshape: { fill: '#fce7f3', stroke: '#ec4899', text: '#9d174d' },
+  concat:  { fill: '#fef3c7', stroke: '#f59e0b', text: '#92400e' }
+};
+const ACTIVE_COLOR = { fill: '#dbeafe', stroke: '#0052cc', text: '#1e40af' };
+const HIGHLIGHT_COLOR = { fill: '#fff3e0', stroke: '#ff6d00', text: '#bf360c' };
+const DIM_OPACITY = 0.3;
+
+let _nodeLayers = {};
+function layoutGraph(nodes, edges) {
+  const layers = {};
+  const visited = {};
+  function getLayer(id) {
+    if (visited[id] !== undefined) return visited[id];
+    const incoming = edges.filter(e => e.to === id);
+    if (incoming.length === 0) { visited[id] = 0; return 0; }
+    let maxLayer = 0;
+    for (const e of incoming) maxLayer = Math.max(maxLayer, getLayer(e.from) + 1);
+    visited[id] = maxLayer;
+    return maxLayer;
+  }
+  for (const n of nodes) getLayer(n.id);
+  _nodeLayers = { ...visited };
+  for (const n of nodes) {
+    const l = visited[n.id];
+    if (!layers[l]) layers[l] = [];
+    layers[l].push(n.id);
+  }
+
+  const NODE_W = 120, NODE_H = 42, GAP_X = 28, GAP_Y = 10;
+  const sortedLayers = Object.keys(layers).sort((a, b) => a - b);
+  const positions = {};
+  for (const l of sortedLayers) {
+    const ids = layers[l];
+    const x = +l * (NODE_W + GAP_X) + 10;
+    let y = 10;
+    for (const id of ids) {
+      positions[id] = { x, y };
+      y += NODE_H + GAP_Y;
+    }
+  }
+  const maxW = sortedLayers.length * (NODE_W + GAP_X) + 20;
+  const maxH = Math.max(...sortedLayers.map(l => layers[l].length * (NODE_H + GAP_Y) + 10));
+  return { positions, nodeW: NODE_W, nodeH: NODE_H, width: Math.max(maxW, 600), height: Math.max(maxH, 80) };
+}
+
+let _selectedNodeId = null;
+let _dependencyIds = new Set();
+
+function renderGraph(selectedId) {
+  const container = document.getElementById('graphContainer');
+  const { positions, nodeW, nodeH, width, height } = layoutGraph(NODES, GRAPH_EDGES);
+  const svgNS = 'http://www.w3.org/2000/svg';
+
+  let svg = container.querySelector('svg');
+  if (!svg) { svg = document.createElementNS(svgNS, 'svg'); container.appendChild(svg); }
+  svg.setAttribute('width', width);
+  svg.setAttribute('height', height);
+  svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+  svg.innerHTML = '';
+
+  // Edge marker
+  const defs = document.createElementNS(svgNS, 'defs');
+  ['arrowhead','arrowhead-active'].forEach((id, i) => {
+    const m = document.createElementNS(svgNS, 'marker');
+    m.setAttribute('id', id);
+    m.setAttribute('markerWidth', '8');
+    m.setAttribute('markerHeight', '6');
+    m.setAttribute('refX', '8');
+    m.setAttribute('refY', '3');
+    m.setAttribute('orient', 'auto');
+    const p = document.createElementNS(svgNS, 'polygon');
+    p.setAttribute('points', '0 0, 8 3, 0 6');
+    p.setAttribute('fill', i === 0 ? '#999' : '#ff6d00');
+    m.appendChild(p);
+    defs.appendChild(m);
+  });
+  svg.appendChild(defs);
+
+  // Compute port offsets: distribute connection points along node edges
+  const srcPorts = {}, dstPorts = {};
+  for (const e of GRAPH_EDGES) {
+    if (!positions[e.from] || !positions[e.to]) continue;
+    (srcPorts[e.from] = srcPorts[e.from] || []).push(e.to);
+    (dstPorts[e.to] = dstPorts[e.to] || []).push(e.from);
+  }
+  function portOffset(map, id, neighbor) {
+    const arr = map[id] || [];
+    const idx = arr.indexOf(neighbor);
+    const n = arr.length;
+    if (n <= 1) return 0.5;
+    return (idx + 1) / (n + 1);
+  }
+
+  // Edges
+  for (const edge of GRAPH_EDGES) {
+    const from = positions[edge.from];
+    const to = positions[edge.to];
+    if (!from || !to) continue;
+    const active = _dependencyIds.has(edge.from) && _dependencyIds.has(edge.to);
+    const path = document.createElementNS(svgNS, 'path');
+    const y1off = portOffset(srcPorts, edge.from, edge.to);
+    const y2off = portOffset(dstPorts, edge.to, edge.from);
+    const x1 = from.x + nodeW, y1 = from.y + y1off * nodeH;
+    const x2 = to.x, y2 = to.y + y2off * nodeH;
+    const midX = (x1 + x2) / 2;
+
+    const fl = _nodeLayers[edge.from], tl = _nodeLayers[edge.to];
+    let d;
+    if (tl - fl > 1) {
+      let interTop = Infinity;
+      for (const [id, l] of Object.entries(_nodeLayers)) {
+        if (l > fl && l < tl && positions[id]) {
+          interTop = Math.min(interTop, positions[id].y);
+        }
+      }
+      const archY = Math.min(interTop, y1, y2) - 12;
+      d = 'M' + x1 + ',' + y1 + ' C' + midX + ',' + archY + ' ' + midX + ',' + archY + ' ' + x2 + ',' + y2;
+    } else {
+      d = 'M' + x1 + ',' + y1 + ' C' + midX + ',' + y1 + ' ' + midX + ',' + y2 + ' ' + x2 + ',' + y2;
+    }
+    path.setAttribute('d', d);
+    path.setAttribute('class', active ? 'graph-edge graph-edge-active' : 'graph-edge');
+    path.setAttribute('opacity', active ? 1 : DIM_OPACITY);
+    path.setAttribute('marker-end', 'url(' + (active ? '#arrowhead-active' : '#arrowhead') + ')');
+    svg.appendChild(path);
+  }
+
+  // Nodes
+  for (const node of NODES) {
+    const pos = positions[node.id];
+    if (!pos) continue;
+    const isSelected = node.id === selectedId;
+    const isDep = _dependencyIds.has(node.id);
+    const baseColor = OP_COLORS[node.type] || OP_COLORS.conv2d;
+    let fill, stroke, text;
+    if (isSelected) {
+      fill = HIGHLIGHT_COLOR.fill; stroke = HIGHLIGHT_COLOR.stroke; text = HIGHLIGHT_COLOR.text;
+    } else if (isDep) {
+      fill = ACTIVE_COLOR.fill; stroke = ACTIVE_COLOR.stroke; text = ACTIVE_COLOR.text;
+    } else {
+      fill = baseColor.fill; stroke = baseColor.stroke; text = baseColor.text;
+    }
+    const g = document.createElementNS(svgNS, 'g');
+    g.setAttribute('class', 'graph-node');
+    g.setAttribute('data-id', node.id);
+    g.setAttribute('opacity', isDep || isSelected ? 1 : DIM_OPACITY);
+    g.style.cursor = 'pointer';
+    g.addEventListener('click', () => selectNode(node.id));
+
+    const rect = document.createElementNS(svgNS, 'rect');
+    rect.setAttribute('x', pos.x);
+    rect.setAttribute('y', pos.y);
+    rect.setAttribute('width', nodeW);
+    rect.setAttribute('height', nodeH);
+    rect.setAttribute('rx', '5');
+    rect.setAttribute('ry', '5');
+    rect.setAttribute('fill', fill);
+    rect.setAttribute('stroke', stroke);
+    g.appendChild(rect);
+
+    const typeLabel = document.createElementNS(svgNS, 'text');
+    typeLabel.setAttribute('x', pos.x + nodeW / 2);
+    typeLabel.setAttribute('y', pos.y + nodeH / 2 - 11);
+    typeLabel.setAttribute('text-anchor', 'middle');
+    typeLabel.setAttribute('dominant-baseline', 'central');
+    typeLabel.setAttribute('fill', text);
+    typeLabel.setAttribute('font-size', '8');
+    typeLabel.setAttribute('opacity', '0.55');
+    typeLabel.textContent = REF_NAMES[node.id] || node.id;
+    g.appendChild(typeLabel);
+
+    const label = document.createElementNS(svgNS, 'text');
+    label.setAttribute('x', pos.x + nodeW / 2);
+    label.setAttribute('y', pos.y + nodeH / 2 + (node.detail ? 0 : 2));
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('dominant-baseline', 'central');
+    label.setAttribute('fill', text);
+    label.setAttribute('font-size', '10');
+    label.setAttribute('font-weight', '600');
+    label.textContent = node.label;
+    g.appendChild(label);
+
+    if (node.detail) {
+      const det = document.createElementNS(svgNS, 'text');
+      det.setAttribute('x', pos.x + nodeW / 2);
+      det.setAttribute('y', pos.y + nodeH / 2 + 13);
+      det.setAttribute('text-anchor', 'middle');
+      det.setAttribute('dominant-baseline', 'central');
+      det.setAttribute('fill', text);
+      det.setAttribute('font-size', '8');
+      det.setAttribute('opacity', '0.7');
+      det.textContent = node.detail;
+      g.appendChild(det);
+    }
+
+    svg.appendChild(g);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Dependency tracer
+// ---------------------------------------------------------------------------
+function traceDeps(nodeId) {
+  const deps = new Set();
+  function walk(id) {
+    if (deps.has(id)) return;
+    deps.add(id);
+    const node = NODE_MAP[id];
+    if (!node) return;
+    for (const inp of node.inputs) walk(inp);
+  }
+  walk(nodeId);
+  return deps;
+}
+
+// Topological order from deps
+function topoOrder(deps) {
+  const inDegree = {};
+  const adj = {};
+  for (const id of deps) {
+    const node = NODE_MAP[id];
+    if (!node) continue;
+    if (!adj[id]) adj[id] = [];
+    if (inDegree[id] === undefined) inDegree[id] = 0;
+    for (const inp of node.inputs) {
+      if (deps.has(inp)) {
+        adj[inp] = adj[inp] || [];
+        adj[inp].push(id);
+        inDegree[id] = (inDegree[id] || 0) + 1;
+      }
+    }
+  }
+  const queue = [];
+  for (const id of deps) if ((inDegree[id] || 0) === 0) queue.push(id);
+  const order = [];
+  while (queue.length) {
+    const id = queue.shift();
+    order.push(id);
+    for (const next of (adj[id] || [])) {
+      inDegree[next]--;
+      if (inDegree[next] === 0) queue.push(next);
+    }
+  }
+  return order;
+}
+
+// ---------------------------------------------------------------------------
+// Subgraph builder
+// ---------------------------------------------------------------------------
+function constantFromWeights(builder, weights, name, dataType, shape) {
+  const sl = weights.getSlice(name);
+  const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+  if (dataType === 'float32') return builder.constant({ dataType, shape }, new Float32Array(buf));
+  if (dataType === 'int64') return builder.constant({ dataType, shape }, new BigInt64Array(buf));
+  throw new Error('Unsupported type: ' + dataType);
+}
+
+async function buildSubgraph(deviceType, weights, targetId, inputData) {
+  const context = await navigator.ml.createContext({ deviceType });
+  const builder = new MLGraphBuilder(context);
+  const deps = traceDeps(targetId);
+  const order = topoOrder(deps);
+  const tensors = {};
+
+  const buildStart = performance.now();
+
+  for (const id of order) {
+    const node = NODE_MAP[id];
+    if (!node) continue;
+    if (node.type === 'input') {
+      tensors[id] = builder.input('input', { dataType: 'float32', shape: [1,128,128,3] });
+      continue;
+    }
+    const inTensors = node.inputs.map(i => tensors[i]).filter(Boolean);
+
+    switch (node.type) {
+      case 'transpose':
+        tensors[id] = builder.transpose(inTensors[0], node.params);
+        break;
+      case 'reshape':
+        tensors[id] = builder.reshape(inTensors[0], node.params.shape || node.shape);
+        break;
+      case 'conv2d': {
+        const w = constantFromWeights(builder, weights, node.weights[0].name, 'float32', node.weights[0].shape);
+        const p = { ...node.params };
+        if (node.weights.length > 1) {
+          p.bias = constantFromWeights(builder, weights, node.weights[1].name, 'float32', node.weights[1].shape);
+        }
+        console.log("Building conv2d", id, "weights", w, "conv2d Options", p);
+        tensors[id] = builder.conv2d(inTensors[0], w, p);
+        break;
+      }
+      case 'relu':
+        tensors[id] = builder.relu(inTensors[0]);
+        break;
+      case 'add':
+        tensors[id] = builder.add(inTensors[0], inTensors[1]);
+        break;
+      case 'pad':
+        tensors[id] = builder.pad(inTensors[0], node.params.paddingBegin || [0,0,0,0], node.params.paddingEnd || [0,0,0,0]);
+        break;
+      case 'maxpool':
+        tensors[id] = builder.maxPool2d(inTensors[0], node.params);
+        break;
+      case 'concat':
+        tensors[id] = builder.concat(inTensors, node.params.axis || 0);
+        break;
+    }
+  }
+
+  const output = tensors[targetId];
+  if (!output) throw new Error('Failed to build target node: ' + targetId);
+
+  const namedOutputs = { output };
+  const outputShapes = {};
+  for (const [name, op] of Object.entries(namedOutputs)) {
+    try { outputShapes[name] = Array.from(op.shape); } catch(e) { outputShapes[name] = null; }
+  }
+  const graph = await builder.build(namedOutputs);
+  const buildTime = performance.now() - buildStart;
+
+  // Use provided inputData or generate fresh
+  if (!inputData) {
+    inputData = new Float32Array(128*128*3);
+    if (fillSelect.value === 'fixed') {
+      inputData.fill(parseFloat(fixedValueInput.value) || 0);
+    } else {
+      for (let i = 0; i < inputData.length; i++) inputData[i] = Math.random() * 2 - 1;
+    }
+  }
+  const inputTensor = await context.createTensor({ dataType: 'float32', shape: [1,128,128,3], writable: true });
+  context.writeTensor(inputTensor, inputData);
+
+  // Output tensor
+  const outShape = outputShapes.output || node.shape;
+  const outputTensor = await context.createTensor({ dataType: 'float32', shape: outShape, readable: true });
+
+  const t0 = performance.now();
+  context.dispatch(graph, { input: inputTensor }, { output: outputTensor });
+  const inferTime = performance.now() - t0;
+
+  const buf = await context.readTensor(outputTensor);
+  const result = new Float32Array(buf);
+
+  // Benchmark
+  const NUM_RUNS = 0;
+  const times = [];
+  for (let i = 0; i < NUM_RUNS; i++) {
+    const tb = performance.now();
+    context.dispatch(graph, { input: inputTensor }, { output: outputTensor });
+    await context.readTensor(outputTensor);
+    times.push(performance.now() - tb);
+  }
+  const avgTime = times.reduce((a, b) => a + b, 0) / times.length;
+
+  return { result, shape: outShape, buildTime, inferTime, avgTime, inputData };
+}
+
+// ---------------------------------------------------------------------------
+// Input generation
+// ---------------------------------------------------------------------------
+let _storedInputData = null;
+
+function generateInput() {
+  if (fillSelect.value === 'image') {
+    const img = document.getElementById('inputImage');
+    if (!img.complete || !img.naturalWidth) {
+      document.getElementById('inputPreview').innerHTML = '<span style="color:#d32f2f;">No image loaded. Choose an image first.</span>';
+      return;
+    }
+    _storedInputData = preprocessImage(img);
+    const preview = Array.from(_storedInputData.slice(0, 8)).map(v => v.toFixed(4)).join(', ');
+    document.getElementById('inputPreview').innerHTML =
+      'Generated (image) [' + _storedInputData.length + ' values]: <b>[' + preview + ', ...]</b>';
+    return;
+  }
+
+  _storedInputData = new Float32Array(128*128*3);
+  if (fillSelect.value === 'fixed') {
+    _storedInputData.fill(parseFloat(fixedValueInput.value) || 0);
+  } else {
+    for (let i = 0; i < _storedInputData.length; i++) _storedInputData[i] = Math.random() * 2 - 1;
+  }
+  const preview = Array.from(_storedInputData.slice(0, 8)).map(v => v.toFixed(4)).join(', ');
+  document.getElementById('inputPreview').innerHTML =
+    'Generated [' + _storedInputData.length + ' values]: <b>[' + preview + ', ...]</b>';
+}
+
+function preprocessImage(imageElement) {
+  const targetWidth = 128;
+  const targetHeight = 128;
+  const originalWidth = imageElement.naturalWidth;
+  const originalHeight = imageElement.naturalHeight;
+
+  const aspectRatio = originalWidth / originalHeight;
+  const targetAspectRatio = targetWidth / targetHeight;
+
+  let scale, canvasWidth, canvasHeight;
+  if (aspectRatio > targetAspectRatio) {
+    scale = targetWidth / originalWidth;
+    canvasHeight = Math.round(originalHeight * scale);
+    canvasWidth = targetWidth;
+  } else {
+    scale = targetHeight / originalHeight;
+    canvasWidth = Math.round(originalWidth * scale);
+    canvasHeight = targetHeight;
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = targetWidth;
+  canvas.height = targetHeight;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, targetWidth, targetHeight);
+
+  const drawWidth = Math.round(canvasWidth);
+  const drawHeight = Math.round(canvasHeight);
+  const drawX = Math.round((targetWidth - drawWidth) / 2);
+  const drawY = Math.round((targetHeight - drawHeight) / 2);
+
+  ctx.drawImage(imageElement, drawX, drawY, drawWidth, drawHeight);
+
+  const imageData = ctx.getImageData(0, 0, targetWidth, targetHeight);
+  const data = imageData.data;
+  const tensor = new Float32Array(targetHeight * targetWidth * 3);
+
+  for (let i = 0; i < targetHeight * targetWidth; i++) {
+    const r = data[i * 4] / 255;
+    const g = data[i * 4 + 1] / 255;
+    const b = data[i * 4 + 2] / 255;
+    tensor[i * 3] = r * 2 - 1;
+    tensor[i * 3 + 1] = g * 2 - 1;
+    tensor[i * 3 + 2] = b * 2 - 1;
+  }
+
+  return tensor;
+}
+
+// ---------------------------------------------------------------------------
+// Selection and running
+// ---------------------------------------------------------------------------
+function selectNode(id) {
+  _selectedNodeId = id;
+  _dependencyIds = traceDeps(id);
+  renderGraph(id);
+
+  const node = NODE_MAP[id];
+  const el = document.getElementById('nodeInfo');
+  const isInput = id === 'input';
+  el.innerHTML = '<strong>' + node.label + '</strong> <span style="color:#888;">(' + node.id + ')</span><br>' +
+    'type: ' + node.type + ' | shape: ' + JSON.stringify(node.shape) + '<br>' +
+    'deps: ' + (_dependencyIds.size - 1) + ' nodes' +
+    (isInput ? '<br><span style="color:#999;font-style:italic;">Select any operator node to run</span>' : '');
+  document.getElementById('runBtn').disabled = isInput;
+  document.getElementById('runAllBtn').disabled = isInput;
+}
+
+async function runSelected() {
+  const runBtn = document.getElementById('runBtn');
+  const targetId = _selectedNodeId;
+  if (!targetId) { alert('Click a node in the graph first.'); return; }
+  const deviceType = deviceSelect.value;
+
+  try {
+    runBtn.disabled = true;
+    statusEl.className = 'status info';
+    if (!navigator.ml) throw new Error('WebNN not supported');
+
+    statusEl.textContent = 'Loading weights...';
+    const weights = await WeightsFile.load(
+      '../face_detector-webnn/face_detector.weights',
+      '../face_detector-webnn/face_detector.manifest.json'
+    );
+
+    if (!_storedInputData) generateInput();
+
+    statusEl.textContent = 'Building on ' + deviceType.toUpperCase() + '...';
+    const main = await buildSubgraph(deviceType, weights, targetId, _storedInputData);
+
+    const node = NODE_MAP[targetId];
+    statusEl.className = 'status success';
+    statusEl.textContent = node.label + ' (' + targetId + ') | ' + deviceType.toUpperCase() + ' build:' + main.buildTime.toFixed(2) + 'ms avg:' + main.avgTime.toFixed(2) + 'ms';
+
+    document.getElementById('resultsCard').style.display = '';
+    let html = '<div><strong>input</strong> shape=[1,128,128,3] (float32)</div>';
+    const inPreview = Array.from(main.inputData.slice(0, 8)).map(v => v.toFixed(4)).join(', ');
+    html += '<pre>[' + inPreview + ', ...]</pre>';
+
+    html += '<div style="margin-top:0.5rem;"><strong>output</strong> shape=' + JSON.stringify(main.shape) + ' (float32)</div>';
+    const outPreview = Array.from(main.result.slice(0, 16)).map(v => v.toFixed(6)).join(', ');
+    html += '<div style="font-size:0.8rem;color:#555;">' + deviceType.toUpperCase() + ' output</div>';
+    html += '<pre>[' + outPreview + (main.result.length > 16 ? ', ...' : '') + ']</pre>';
+
+    document.getElementById('results').innerHTML = html;
+
+  } catch (err) {
+    statusEl.className = 'status error';
+    statusEl.textContent = 'Error: ' + err.message;
+    console.error(err);
+  } finally {
+    runBtn.disabled = false;
+  }
+}
+
+async function runAll() {
+  const runAllBtn = document.getElementById('runAllBtn');
+  const deviceType = deviceSelect.value;
+
+  try {
+    runAllBtn.disabled = true;
+    statusEl.className = 'status info';
+    if (!navigator.ml) throw new Error('WebNN not supported');
+
+    const weights = await WeightsFile.load(
+      '../face_detector-webnn/face_detector.weights',
+      '../face_detector-webnn/face_detector.manifest.json'
+    );
+
+    if (!_storedInputData) generateInput();
+
+    document.getElementById('resultsCard').style.display = '';
+    let html = '<table style="width:100%;border-collapse:collapse;font-size:0.8rem;">';
+    html += '<tr style="color:#666;">' +
+      '<th>Node</th><th>Type</th><th>Shape</th><th>Build(ms)</th><th>' + deviceType.toUpperCase() + '(ms)</th></tr>';
+
+    let fails = [];
+
+    for (let i = 0; i < NODES.length; i++) {
+      const node = NODES[i];
+      if (node.type === 'input') continue;
+      statusEl.textContent = 'Building ' + node.id + ' (' + (i+1) + '/' + NODES.length + ')...';
+
+      try {
+        const main = await buildSubgraph(deviceType, weights, node.id, _storedInputData);
+        html += '<tr><td>' + node.id + '</td><td>' + node.type + '</td><td>' + JSON.stringify(main.shape) + '</td>' +
+          '<td>' + main.buildTime.toFixed(2) + '</td><td>' + main.avgTime.toFixed(2) + '</td></tr>';
+      } catch (e) {
+        fails.push(node.id);
+        html += '<tr style="background:#ffebee;"><td>' + node.id + '</td><td>' + node.type + '</td><td colspan="3">ERROR: ' + e.message + '</td></tr>';
+      }
+    }
+    html += '</table>';
+    document.getElementById('results').innerHTML = html;
+
+    let msg = 'All ' + NODES.length + ' nodes processed.';
+    if (fails.length) msg += ' Failures: ' + fails.join(', ') + '.';
+    statusEl.className = 'status success';
+    statusEl.textContent = msg;
+
+  } catch (err) {
+    statusEl.className = 'status error';
+    statusEl.textContent = 'Error: ' + err.message;
+    console.error(err);
+  } finally {
+    runAllBtn.disabled = false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Init
+// ---------------------------------------------------------------------------
+const statusEl = document.getElementById('status');
+const fillSelect = document.getElementById('fillSelect');
+const fixedValueInput = document.getElementById('fixedValue');
+const imageInput = document.getElementById('imageInput');
+const imageBtn = document.getElementById('imageBtn');
+const imagePreview = document.getElementById('imagePreview');
+const inputImage = document.getElementById('inputImage');
+const imageInfo = document.getElementById('imageInfo');
+
+fillSelect.addEventListener('change', () => {
+  const mode = fillSelect.value;
+  fixedValueInput.style.display = mode === 'fixed' ? '' : 'none';
+  imageBtn.style.display = mode === 'image' ? '' : 'none';
+  imagePreview.style.display = mode === 'image' ? '' : 'none';
+  if (mode === 'image') {
+    if (!inputImage.naturalWidth) {
+      inputImage.src = '../assets/portrait.jpg';
+      inputImage.style.display = '';
+      inputImage.onload = () => {
+        imageInfo.textContent = 'portrait.jpg \u2014 ' + inputImage.naturalWidth + '\u00d7' + inputImage.naturalHeight;
+        generateInput();
+      };
+    } else if (!_storedInputData) {
+      generateInput();
+    }
+  } else {
+    inputImage.style.display = 'none';
+    imageInfo.textContent = '';
+  }
+});
+
+imageInput.addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const url = URL.createObjectURL(file);
+  inputImage.src = url;
+  inputImage.style.display = '';
+  imageInfo.textContent = file.name + ' (' + file.type + ')';
+  inputImage.onload = () => {
+    imageInfo.textContent = file.name + ' \u2014 ' + inputImage.naturalWidth + '\u00d7' + inputImage.naturalHeight;
+    generateInput();
+  };
+});
+
+// Generate input and select input node by default
+generateInput();
+selectNode('input');
+  </script>
+</body>
+</html>

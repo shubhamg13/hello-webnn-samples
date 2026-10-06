@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Face Landmarker TFLite</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f5f5f5; color: #1a1a1a; padding: 2rem; }
+    .container { max-width: 700px; margin: 0 auto; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+    .subtitle { color: #666; margin-bottom: 1.5rem; font-size: 0.9rem; }
+    .card { background: #fff; border-radius: 6px; padding: 1rem 1.25rem; margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+    a { text-decoration: none; color: inherit; display: block; }
+    .card h3 { font-size: 1rem; margin-bottom: 0.25rem; color: #0052cc; }
+    .card p { font-size: 0.85rem; color: #666; }
+    .tag { display: inline-block; font-size: 0.7rem; padding: 1px 6px; border-radius: 3px; margin-left: 0.5rem; vertical-align: middle; }
+    .tag-tf { background: #ff6f00; color: #fff; }
+    .tag-webnn { background: #0052cc; color: #fff; }
+    .tag-py { background: #3572A5; color: #fff; }
+    .section-title { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: #999; margin: 1.5rem 0 0.5rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Face Landmarker TFLite</h1>
+    <p class="subtitle">Face detection &amp; landmark estimation experiments</p>
+
+    <div class="section-title">Frontend Demos</div>
+
+    <a href="face_detection/">
+      <div class="card">
+        <h3>Face Detection Demo <span class="tag tag-tf">TF.js / TFLite</span></h3>
+        <p>Run face detection and optional landmark estimation on a sample image using TFLite or TF.js backends.</p>
+      </div>
+    </a>
+
+    <a href="compare_models/">
+      <div class="card">
+        <h3>Model Comparison <span class="tag tag-tf">TF.js / TFLite</span></h3>
+        <p>Compare raw outputs of the TFLite and TFJS face detection models side by side.</p>
+      </div>
+    </a>
+
+    <a href="preprocess_test/">
+      <div class="card">
+        <h3>Preprocessing Test <span class="tag tag-tf">TF.js</span></h3>
+        <p>Verify image preprocessing pipeline: letterbox padding, pixel normalization, and anchor generation.</p>
+      </div>
+    </a>
+
+    <a href="verify_landmarks/">
+      <div class="card">
+        <h3>Landmarks Verification <span class="tag tag-tf">TFLite</span></h3>
+        <p>End-to-end test: face detection → ROI cropping → landmark detection → projection onto original image.</p>
+      </div>
+    </a>
+
+    <div class="section-title">WebNN</div>
+
+    <a href="webnn_face_detection/">
+      <div class="card">
+        <h3>WebNN Face Detection <span class="tag tag-webnn">WebNN</span></h3>
+        <p>Upload an image, run face detection via WebNN on CPU/GPU/NPU, and see bounding boxes + keypoints drawn on the photo.</p>
+      </div>
+    </a>
+
+    <a href="face_detector-webnn/face_detector.html">
+      <div class="card">
+        <h3>WebNN Face Detector (Raw) <span class="tag tag-webnn">WebNN</span></h3>
+        <p>Full face detection model inference using WebNN API with CPU/GPU/NPU device selection.</p>
+      </div>
+    </a>
+
+    <a href="image_classification/">
+      <div class="card">
+        <h3>Image Classification <span class="tag tag-webnn">WebNN</span></h3>
+        <p>SqueezeNet 1.1 image classification via pure WebNN API (224×224 input, 1000 ImageNet classes).</p>
+      </div>
+    </a>
+
+    <a href="lenet/">
+      <div class="card">
+        <h3>LeNet — Digit Recognition <span class="tag tag-webnn">WebNN</span></h3>
+        <p>Draw a handwritten digit and classify it with LeNet via pure WebNN API (2 conv + 2 FC, MNIST).</p>
+      </div>
+    </a>
+
+    <a href="selfie_segmentation/">
+      <div class="card">
+        <h3>Selfie Segmentation <span class="tag tag-webnn">WebNN</span></h3>
+        <p>Portrait/person segmentation via pure WebNN API (55 conv layers, h-swish, SE blocks, skip connections, 256×256).</p>
+      </div>
+    </a>
+
+    <a href="style_transfer/">
+      <div class="card">
+        <h3>Fast Style Transfer <span class="tag tag-webnn">WebNN</span></h3>
+        <p>Artistic neural style transfer (Starry Night) via pure WebNN API — 540×540, instance normalization, reflection padding, 13 conv + 2 transpose.</p>
+      </div>
+    </a>
+
+    <a href="face_detector_group_test/">
+      <div class="card">
+        <h3>Group Test <span class="tag tag-webnn">WebNN</span></h3>
+        <p>Test model decomposed into connected subgraphs of the first N operators (1–5 ops).</p>
+      </div>
+    </a>
+
+    <a href="graph_explorer/">
+      <div class="card">
+        <h3>Graph Explorer <span class="tag tag-webnn">WebNN</span></h3>
+        <p>Full graph coverage with clickable nodes. Select any node to build and compare its subgraph across devices.</p>
+      </div>
+    </a>
+
+    <div class="section-title">WebNN Tests</div>
+
+    <a href="webnn_tests/">
+      <div class="card">
+        <h3>Conv2D Precision Test <span class="tag tag-webnn">WebNN</span></h3>
+        <p>Test float32 convolution precision across CPU/GPU/NPU backends. NCHW [1,3,128,128] → Conv2D 5×5 → [1,24,64,64].</p>
+      </div>
+    </a>
+
+    <div class="section-title">ONNX</div>
+
+    <a href="onnx_web/">
+      <div class="card">
+        <h3>ONNX Face Landmarker <span class="tag tag-py">ONNX</span></h3>
+        <p>Face detection and landmark estimation via onnxruntime-web with CPU/WebGL backends.</p>
+      </div>
+    </a>
+
+    <a href="onnx_test/">
+      <div class="card">
+        <h3>ONNX Runtime Test <span class="tag tag-py">ONNX</span></h3>
+        <p>Browser-based ONNX model inference test using onnxruntime-web.</p>
+      </div>
+    </a>
+
+    <a href="onnx_test_node/">
+      <div class="card">
+        <h3>Node.js ONNX Test <span class="tag tag-py">ONNX</span></h3>
+        <p>ONNX model inference tests using onnxruntime-node.</p>
+      </div>
+    </a>
+
+    <a href="onnx_workspace/">
+      <div class="card">
+        <h3>ONNX Python Workspace <span class="tag tag-py">Python</span></h3>
+        <p>Model conversion and verification scripts for ONNX format.</p>
+      </div>
+    </a>
+
+    <div class="section-title">Reference &amp; Python</div>
+
+    <a href="reference/reference_draw_mesh.js">
+      <div class="card">
+        <h3>MediaPipe Face Landmarker <span class="tag tag-py">Reference</span></h3>
+        <p>MediaPipe tasks-vision FaceLandmarker reference implementation with mesh drawing.</p>
+      </div>
+    </a>
+  </div>
+</body>
+</html>

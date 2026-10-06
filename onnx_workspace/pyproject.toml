@@ -1,0 +1,16 @@
+[project]
+name = "onnx-workspace"
+version = "0.1.0"
+description = "ONNX conversion workspace for face detection models"
+requires-python = ">=3.11"
+dependencies = [
+    "tf2onnx",
+    "tflite2onnx",
+    "onnxruntime",
+    "numpy",
+    "Pillow",
+    "tensorflow>=2.21.0",
+]
+
+[tool.uv]
+dev-dependencies = []

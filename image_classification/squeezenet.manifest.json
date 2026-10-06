@@ -1,0 +1,454 @@
+{
+  "format": "wg-weights-manifest",
+  "tensors": {
+    "reshape_attr_tensor118": {
+      "byteOffset": 4,
+      "byteLength": 16,
+      "shape": [
+        2
+      ]
+    },
+    "squeezenet0_conv0_bias": {
+      "byteOffset": 20,
+      "byteLength": 256,
+      "shape": [
+        64
+      ]
+    },
+    "squeezenet0_conv0_weight": {
+      "byteOffset": 276,
+      "byteLength": 6912,
+      "shape": [
+        64,
+        3,
+        3,
+        3
+      ]
+    },
+    "squeezenet0_conv10_bias": {
+      "byteOffset": 7188,
+      "byteLength": 128,
+      "shape": [
+        32
+      ]
+    },
+    "squeezenet0_conv10_weight": {
+      "byteOffset": 7316,
+      "byteLength": 32768,
+      "shape": [
+        32,
+        256,
+        1,
+        1
+      ]
+    },
+    "squeezenet0_conv11_bias": {
+      "byteOffset": 40084,
+      "byteLength": 512,
+      "shape": [
+        128
+      ]
+    },
+    "squeezenet0_conv11_weight": {
+      "byteOffset": 40596,
+      "byteLength": 16384,
+      "shape": [
+        128,
+        32,
+        1,
+        1
+      ]
+    },
+    "squeezenet0_conv12_bias": {
+      "byteOffset": 56980,
+      "byteLength": 512,
+      "shape": [
+        128
+      ]
+    },
+    "squeezenet0_conv12_weight": {
+      "byteOffset": 57492,
+      "byteLength": 147456,
+      "shape": [
+        128,
+        32,
+        3,
+        3
+      ]
+    },
+    "squeezenet0_conv13_bias": {
+      "byteOffset": 204948,
+      "byteLength": 192,
+      "shape": [
+        48
+      ]
+    },
+    "squeezenet0_conv13_weight": {
+      "byteOffset": 205140,
+      "byteLength": 49152,
+      "shape": [
+        48,
+        256,
+        1,
+        1
+      ]
+    },
+    "squeezenet0_conv14_bias": {
+      "byteOffset": 254292,
+      "byteLength": 768,
+      "shape": [
+        192
+      ]
+    },
+    "squeezenet0_conv14_weight": {
+      "byteOffset": 255060,
+      "byteLength": 36864,
+      "shape": [
+        192,
+        48,
+        1,
+        1
+      ]
+    },
+    "squeezenet0_conv15_bias": {
+      "byteOffset": 291924,
+      "byteLength": 768,
+      "shape": [
+        192
+      ]
+    },
+    "squeezenet0_conv15_weight": {
+      "byteOffset": 292692,
+      "byteLength": 331776,
+      "shape": [
+        192,
+        48,
+        3,
+        3
+      ]
+    },
+    "squeezenet0_conv16_bias": {
+      "byteOffset": 624468,
+      "byteLength": 192,
+      "shape": [
+        48
+      ]
+    },
+    "squeezenet0_conv16_weight": {
+      "byteOffset": 624660,
+      "byteLength": 73728,
+      "shape": [
+        48,
+        384,
+        1,
+        1
+      ]
+    },
+    "squeezenet0_conv17_bias": {
+      "byteOffset": 698388,
+      "byteLength": 768,
+      "shape": [
+        192
+      ]
+    },
+    "squeezenet0_conv17_weight": {
+      "byteOffset": 699156,
+      "byteLength": 36864,
+      "shape": [
+        192,
+        48,
+        1,
+        1
+      ]
+    },
+    "squeezenet0_conv18_bias": {
+      "byteOffset": 736020,
+      "byteLength": 768,
+      "shape": [
+        192
+      ]
+    },
+    "squeezenet0_conv18_weight": {
+      "byteOffset": 736788,
+      "byteLength": 331776,
+      "shape": [
+        192,
+        48,
+        3,
+        3
+      ]
+    },
+    "squeezenet0_conv19_bias": {
+      "byteOffset": 1068564,
+      "byteLength": 256,
+      "shape": [
+        64
+      ]
+    },
+    "squeezenet0_conv19_weight": {
+      "byteOffset": 1068820,
+      "byteLength": 98304,
+      "shape": [
+        64,
+        384,
+        1,
+        1
+      ]
+    },
+    "squeezenet0_conv1_bias": {
+      "byteOffset": 1167124,
+      "byteLength": 64,
+      "shape": [
+        16
+      ]
+    },
+    "squeezenet0_conv1_weight": {
+      "byteOffset": 1167188,
+      "byteLength": 4096,
+      "shape": [
+        16,
+        64,
+        1,
+        1
+      ]
+    },
+    "squeezenet0_conv20_bias": {
+      "byteOffset": 1171284,
+      "byteLength": 1024,
+      "shape": [
+        256
+      ]
+    },
+    "squeezenet0_conv20_weight": {
+      "byteOffset": 1172308,
+      "byteLength": 65536,
+      "shape": [
+        256,
+        64,
+        1,
+        1
+      ]
+    },
+    "squeezenet0_conv21_bias": {
+      "byteOffset": 1237844,
+      "byteLength": 1024,
+      "shape": [
+        256
+      ]
+    },
+    "squeezenet0_conv21_weight": {
+      "byteOffset": 1238868,
+      "byteLength": 589824,
+      "shape": [
+        256,
+        64,
+        3,
+        3
+      ]
+    },
+    "squeezenet0_conv22_bias": {
+      "byteOffset": 1828692,
+      "byteLength": 256,
+      "shape": [
+        64
+      ]
+    },
+    "squeezenet0_conv22_weight": {
+      "byteOffset": 1828948,
+      "byteLength": 131072,
+      "shape": [
+        64,
+        512,
+        1,
+        1
+      ]
+    },
+    "squeezenet0_conv23_bias": {
+      "byteOffset": 1960020,
+      "byteLength": 1024,
+      "shape": [
+        256
+      ]
+    },
+    "squeezenet0_conv23_weight": {
+      "byteOffset": 1961044,
+      "byteLength": 65536,
+      "shape": [
+        256,
+        64,
+        1,
+        1
+      ]
+    },
+    "squeezenet0_conv24_bias": {
+      "byteOffset": 2026580,
+      "byteLength": 1024,
+      "shape": [
+        256
+      ]
+    },
+    "squeezenet0_conv24_weight": {
+      "byteOffset": 2027604,
+      "byteLength": 589824,
+      "shape": [
+        256,
+        64,
+        3,
+        3
+      ]
+    },
+    "squeezenet0_conv25_bias": {
+      "byteOffset": 2617428,
+      "byteLength": 4000,
+      "shape": [
+        1000
+      ]
+    },
+    "squeezenet0_conv25_weight": {
+      "byteOffset": 2621428,
+      "byteLength": 2048000,
+      "shape": [
+        1000,
+        512,
+        1,
+        1
+      ]
+    },
+    "squeezenet0_conv2_bias": {
+      "byteOffset": 4669428,
+      "byteLength": 256,
+      "shape": [
+        64
+      ]
+    },
+    "squeezenet0_conv2_weight": {
+      "byteOffset": 4669684,
+      "byteLength": 4096,
+      "shape": [
+        64,
+        16,
+        1,
+        1
+      ]
+    },
+    "squeezenet0_conv3_bias": {
+      "byteOffset": 4673780,
+      "byteLength": 256,
+      "shape": [
+        64
+      ]
+    },
+    "squeezenet0_conv3_weight": {
+      "byteOffset": 4674036,
+      "byteLength": 36864,
+      "shape": [
+        64,
+        16,
+        3,
+        3
+      ]
+    },
+    "squeezenet0_conv4_bias": {
+      "byteOffset": 4710900,
+      "byteLength": 64,
+      "shape": [
+        16
+      ]
+    },
+    "squeezenet0_conv4_weight": {
+      "byteOffset": 4710964,
+      "byteLength": 8192,
+      "shape": [
+        16,
+        128,
+        1,
+        1
+      ]
+    },
+    "squeezenet0_conv5_bias": {
+      "byteOffset": 4719156,
+      "byteLength": 256,
+      "shape": [
+        64
+      ]
+    },
+    "squeezenet0_conv5_weight": {
+      "byteOffset": 4719412,
+      "byteLength": 4096,
+      "shape": [
+        64,
+        16,
+        1,
+        1
+      ]
+    },
+    "squeezenet0_conv6_bias": {
+      "byteOffset": 4723508,
+      "byteLength": 256,
+      "shape": [
+        64
+      ]
+    },
+    "squeezenet0_conv6_weight": {
+      "byteOffset": 4723764,
+      "byteLength": 36864,
+      "shape": [
+        64,
+        16,
+        3,
+        3
+      ]
+    },
+    "squeezenet0_conv7_bias": {
+      "byteOffset": 4760628,
+      "byteLength": 128,
+      "shape": [
+        32
+      ]
+    },
+    "squeezenet0_conv7_weight": {
+      "byteOffset": 4760756,
+      "byteLength": 16384,
+      "shape": [
+        32,
+        128,
+        1,
+        1
+      ]
+    },
+    "squeezenet0_conv8_bias": {
+      "byteOffset": 4777140,
+      "byteLength": 512,
+      "shape": [
+        128
+      ]
+    },
+    "squeezenet0_conv8_weight": {
+      "byteOffset": 4777652,
+      "byteLength": 16384,
+      "shape": [
+        128,
+        32,
+        1,
+        1
+      ]
+    },
+    "squeezenet0_conv9_bias": {
+      "byteOffset": 4794036,
+      "byteLength": 512,
+      "shape": [
+        128
+      ]
+    },
+    "squeezenet0_conv9_weight": {
+      "byteOffset": 4794548,
+      "byteLength": 147456,
+      "shape": [
+        128,
+        32,
+        3,
+        3
+      ]
+    }
+  }
+}

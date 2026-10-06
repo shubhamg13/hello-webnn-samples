@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Group Test · face_detector</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: rgba(0, 47, 167, 0.02); color: #1a1a1a; padding: 1rem; }
+    .container { margin: 0 auto; max-width: 900px; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+    .subtitle { color: #666; margin-bottom: 1rem; font-size: 0.9rem; }
+    .card { background: #fff; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .controls { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+    label { font-weight: 600; font-size: 0.9rem; }
+    select { padding: 0.16rem 0.5rem; border: 1px solid #ddd; font-size: 0.9rem; }
+    button { background: rgba(0, 47, 167, 1); color: #fff; border: none; padding: 0.25rem 1rem; font-size: 0.9rem; cursor: pointer; }
+    button:hover { background: rgba(0, 47, 167, 0.85); }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    .status { padding: 1rem; margin-top: 1rem; font-size: 0.9rem; }
+    .status.info { background: #e3f2fd; border-left: 3px solid #2196F3; }
+    .status.success { background: #e9f8f0; border-left: 3px solid #068906; }
+    .status.error { background: #ffebee; border-left: 3px solid #f44336; }
+    table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.85rem; }
+    th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #eee; }
+    th { color: #666; font-weight: 600; }
+    pre { margin: 0.5rem 0; background: #f5f5f5; padding: 0.5rem 1em; overflow-x: auto; font-size: 0.8rem; max-height: 200px; }
+    .group-desc { font-size: 0.85rem; color: #555; margin: 0.5rem 0; }
+    .op-list { font-size: 0.8rem; color: #888; font-family: monospace; }
+    #results { font-size: 0.85rem; margin-top: 1rem; }
+    #graphCard { overflow-x: auto; }
+    #graphCard svg { display: block; margin: 0 auto; }
+    .graph-node { cursor: default; }
+    .graph-node rect { stroke-width: 2; }
+    .graph-node text { font-family: system-ui, sans-serif; }
+    .graph-edge { fill: none; stroke: #999; stroke-width: 1.5; }
+    .graph-edge-active { stroke: #0052cc; stroke-width: 2; }
+    .diff-pass { color: #068906; }
+    .diff-warn { color: #e65100; }
+    .diff-fail { color: #d32f2f; }
+    .diff-table td { font-size: 0.8rem; }
+    .diff-table td.pass { background: #e9f8f0; }
+    .diff-table td.warn { background: #fff3e0; }
+    .diff-table td.fail { background: #ffebee; }
+    .badge { display:inline-block; font-size:0.7rem; padding:0 6px; border-radius:3px; font-weight:600; }
+    .badge-pass { background:#068906; color:#fff; }
+    .badge-warn { background:#e65100; color:#fff; }
+    .badge-fail { background:#d32f2f; color:#fff; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Group Test · face_detector</h1>
+    <p class="subtitle">Test model broken into subgraphs of first N connected operators</p>
+
+    <div class="card">
+      <div class="controls">
+        <label for="groupSelect">Group:</label>
+        <select id="groupSelect"></select>
+        <label for="deviceSelect">Device:</label>
+        <select id="deviceSelect">
+          <option value="cpu">CPU</option>
+          <option value="gpu">GPU</option>
+          <option value="npu">NPU</option>
+        </select>
+        <label for="refDeviceSelect">Ref:</label>
+        <select id="refDeviceSelect">
+          <option value="cpu">CPU</option>
+          <option value="gpu">GPU</option>
+          <option value="npu">NPU</option>
+        </select>
+        <label for="fillSelect">Fill:</label>
+        <select id="fillSelect">
+          <option value="random">Random</option>
+          <option value="fixed">Fixed</option>
+        </select>
+        <input type="number" id="fixedValue" value="0.0" step="0.1" style="width:70px;display:none;">
+        <button id="runBtn" onclick="run()">Run</button>
+        <button id="runAllBtn" onclick="runAll()">Run All</button>
+      </div>
+      <div id="groupInfo" class="group-desc"></div>
+      <div id="opList" class="op-list"></div>
+      <div id="status" class="status info">Ready. Select a group and click Run.</div>
+    </div>
+
+    <div class="card" id="graphCard">
+      <h3>Operator Graph</h3>
+      <div id="graphContainer"></div>
+    </div>
+
+    <div class="card" id="codeCard">
+      <h3>WebNN Code</h3>
+      <pre id="codeContainer" style="max-height:none;font-size:0.8rem;"></pre>
+    </div>
+
+    <div class="card" id="resultsCard" style="display:none;">
+      <h3>Results</h3>
+      <div id="results"></div>
+    </div>
+
+    <div class="card" id="allResultsCard" style="display:none;">
+      <h3>All Groups Summary</h3>
+      <table id="summaryTable" class="diff-table">
+        <thead>
+          <tr><th>Group</th><th>Operators</th><th>Input</th><th>Output</th><th>Build (ms)</th><th id="thDev">Infer (ms)</th><th id="thRef" style="display:none;">Ref (ms)</th><th id="thDiff" style="display:none;">Diff (max|Δ|)</th><th id="thMean" style="display:none;">Diff (mean|Δ|)</th></tr>
+        </thead>
+        <tbody id="summaryBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+class WeightsFile {
+  constructor(buffer, manifest) {
+    this.buffer = buffer;
+    this.manifest = manifest;
+  }
+
+  static async load(weightsPath, manifestPath) {
+    const [wRes, mRes] = await Promise.all([fetch(weightsPath), fetch(manifestPath)]);
+    if (!wRes.ok) throw new Error('Failed to load weights: ' + wRes.statusText);
+    if (!mRes.ok) throw new Error('Failed to load manifest: ' + mRes.statusText);
+    const buffer = await wRes.arrayBuffer();
+    const manifest = await mRes.json();
+    if (manifest.format !== 'wg-weights-manifest') throw new Error('Invalid manifest format');
+    const magic = new TextDecoder().decode(new Uint8Array(buffer, 0, 4));
+    if (magic !== 'WGWT') throw new Error('Invalid weights file');
+    return new WeightsFile(buffer, manifest);
+  }
+
+  getSlice(name) {
+    const t = this.manifest.tensors[name];
+    if (!t) throw new Error('Tensor not found: ' + name);
+    return t;
+  }
+
+  getData(name) {
+    const t = this.getSlice(name);
+    return this.buffer.slice(t.byteOffset, t.byteOffset + t.byteLength);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Group definitions: each is a connected subgraph of the first N operators
+// from the original face_detector model. All groups take the model's original
+// input tensor `input` [1,128,128,3] NHWC.
+// ---------------------------------------------------------------------------
+
+const GROUPS = [
+  {
+    id: 'group1',
+    label: 'Group 1 (1 op)',
+    desc: 'Transpose NHWC→NCHW only',
+    ops: ['transpose'],
+    inputs: [
+      { name: 'input', dataType: 'float32', shape: [1,128,128,3] }
+    ],
+    outputs: [
+      { name: 'output', dataType: 'float32', shape: [1,3,128,128] }
+    ],
+    build: function(builder, weights) {
+      const input = builder.input('input', { dataType: 'float32', shape: [1,128,128,3] });
+      const out = builder.transpose(input, { permutation: [0, 3, 1, 2] });
+      return { output: out };
+    }
+  },
+  {
+    id: 'group2',
+    label: 'Group 2 (3 ops)',
+    desc: 'Transpose + Reshape + Conv2d (3→24, 5×5, stride 2)',
+    ops: ['transpose', 'reshape', 'conv2d'],
+    inputs: [
+      { name: 'input', dataType: 'float32', shape: [1,128,128,3] }
+    ],
+    outputs: [
+      { name: 'output', dataType: 'float32', shape: [1,24,64,64] }
+    ],
+    build: function(builder, weights) {
+      const input = builder.input('input', { dataType: 'float32', shape: [1,128,128,3] });
+      const w408 = constantFromWeights(builder, weights, 'const_fold_opt__408', 'float32', [24,3,5,5]);
+      const w440 = constantFromWeights(builder, weights, 'const_fold_opt__440', 'float32', [24]);
+      const t = builder.transpose(input, { permutation: [0, 3, 1, 2] });
+      const r = builder.reshape(t, [1, 3, 128, 128]);
+      const out = builder.conv2d(r, w408, { padding: [1, 2, 1, 2], strides: [2, 2], bias: w440 });
+      return { output: out };
+    }
+  },
+  {
+    id: 'group3',
+    label: 'Group 3 (4 ops)',
+    desc: 'Transpose + Reshape + Conv2d + Relu',
+    ops: ['transpose', 'reshape', 'conv2d', 'relu'],
+    inputs: [
+      { name: 'input', dataType: 'float32', shape: [1,128,128,3] }
+    ],
+    outputs: [
+      { name: 'output', dataType: 'float32', shape: [1,24,64,64] }
+    ],
+    build: function(builder, weights) {
+      const input = builder.input('input', { dataType: 'float32', shape: [1,128,128,3] });
+      const w408 = constantFromWeights(builder, weights, 'const_fold_opt__408', 'float32', [24,3,5,5]);
+      const w440 = constantFromWeights(builder, weights, 'const_fold_opt__440', 'float32', [24]);
+      const t = builder.transpose(input, { permutation: [0, 3, 1, 2] });
+      const r = builder.reshape(t, [1, 3, 128, 128]);
+      const c = builder.conv2d(r, w408, { padding: [1, 2, 1, 2], strides: [2, 2], bias: w440 });
+      const out = builder.relu(c);
+      return { output: out };
+    }
+  },
+  {
+    id: 'group3_5',
+    label: 'Group 3.5 (5 ops)',
+    desc: 'Transpose + Reshape + Conv2d + Relu + Reshape (no depthwise conv)',
+    ops: ['transpose', 'reshape', 'conv2d', 'relu', 'reshape_dw'],
+    inputs: [
+      { name: 'input', dataType: 'float32', shape: [1,128,128,3] }
+    ],
+    outputs: [
+      { name: 'output', dataType: 'float32', shape: [1,24,64,64] }
+    ],
+    build: function(builder, weights) {
+      const input = builder.input('input', { dataType: 'float32', shape: [1,128,128,3] });
+      const w408 = constantFromWeights(builder, weights, 'const_fold_opt__408', 'float32', [24,3,5,5]);
+      const w440 = constantFromWeights(builder, weights, 'const_fold_opt__440', 'float32', [24]);
+      const t = builder.transpose(input, { permutation: [0, 3, 1, 2] });
+      const r = builder.reshape(t, [1, 3, 128, 128]);
+      const c = builder.conv2d(r, w408, { padding: [1, 2, 1, 2], strides: [2, 2], bias: w440 });
+      const a = builder.relu(c);
+      const out = builder.reshape(a, [1, 24, 64, 64]);
+      return { output: out };
+    }
+  },
+  {
+    id: 'group4',
+    label: 'Group 4 (6 ops)',
+    desc: 'Transpose + Reshape + Conv2d + Relu + Reshape + Depthwise Conv2d (groups=24, 3×3)',
+    ops: ['transpose', 'reshape', 'conv2d', 'relu', 'reshape_dw', 'depthwise_conv2d'],
+    inputs: [
+      { name: 'input', dataType: 'float32', shape: [1,128,128,3] }
+    ],
+    outputs: [
+      { name: 'output', dataType: 'float32', shape: [1,24,64,64] }
+    ],
+    build: function(builder, weights) {
+      const input = builder.input('input', { dataType: 'float32', shape: [1,128,128,3] });
+      const w408 = constantFromWeights(builder, weights, 'const_fold_opt__408', 'float32', [24,3,5,5]);
+      const w440 = constantFromWeights(builder, weights, 'const_fold_opt__440', 'float32', [24]);
+      const w479 = constantFromWeights(builder, weights, 'const_fold_opt__479', 'float32', [24,1,3,3]);
+      const w398 = constantFromWeights(builder, weights, 'const_fold_opt__398', 'float32', [24]);
+      const t = builder.transpose(input, { permutation: [0, 3, 1, 2] });
+      const r = builder.reshape(t, [1, 3, 128, 128]);
+      const c = builder.conv2d(r, w408, { padding: [1, 2, 1, 2], strides: [2, 2], bias: w440 });
+      const a = builder.relu(c);
+      const rd = builder.reshape(a, [1, 24, 64, 64]);
+      const out = builder.conv2d(rd, w479, { padding: [1, 1, 1, 1], groups: 24, bias: w398 });
+      return { output: out };
+    }
+  },
+  {
+    id: 'group5',
+    label: 'Group 5 (7 ops)',
+    desc: 'Transpose + Reshape + Conv2d + Relu + Reshape + Depthwise Conv2d + Pointwise Conv2d (1×1)',
+    ops: ['transpose', 'reshape', 'conv2d', 'relu', 'reshape_dw', 'depthwise_conv2d', 'conv2d_1x1'],
+    inputs: [
+      { name: 'input', dataType: 'float32', shape: [1,128,128,3] }
+    ],
+    outputs: [
+      { name: 'output', dataType: 'float32', shape: [1,24,64,64] }
+    ],
+    build: function(builder, weights) {
+      const input = builder.input('input', { dataType: 'float32', shape: [1,128,128,3] });
+      const w408 = constantFromWeights(builder, weights, 'const_fold_opt__408', 'float32', [24,3,5,5]);
+      const w440 = constantFromWeights(builder, weights, 'const_fold_opt__440', 'float32', [24]);
+      const w479 = constantFromWeights(builder, weights, 'const_fold_opt__479', 'float32', [24,1,3,3]);
+      const w398 = constantFromWeights(builder, weights, 'const_fold_opt__398', 'float32', [24]);
+      const w397 = constantFromWeights(builder, weights, 'const_fold_opt__397', 'float32', [24,24,1,1]);
+      const w381 = constantFromWeights(builder, weights, 'const_fold_opt__381', 'float32', [24]);
+      const t = builder.transpose(input, { permutation: [0, 3, 1, 2] });
+      const r = builder.reshape(t, [1, 3, 128, 128]);
+      const c = builder.conv2d(r, w408, { padding: [1, 2, 1, 2], strides: [2, 2], bias: w440 });
+      const a = builder.relu(c);
+      const rd = builder.reshape(a, [1, 24, 64, 64]);
+      const d = builder.conv2d(rd, w479, { padding: [1, 1, 1, 1], groups: 24, bias: w398 });
+      const out = builder.conv2d(d, w397, { bias: w381 });
+      return { output: out };
+    }
+  },
+  {
+    id: 'group6',
+    label: 'Group 6 (8 ops)',
+    desc: 'Transpose + Reshape + Conv2d + Relu + Reshape + Depthwise Conv2d + Conv2d(1×1) + Add (skip)',
+    ops: ['transpose', 'reshape', 'conv2d', 'relu', 'reshape_dw', 'depthwise_conv2d', 'conv2d_1x1', 'add_1'],
+    inputs: [
+      { name: 'input', dataType: 'float32', shape: [1,128,128,3] }
+    ],
+    outputs: [
+      { name: 'output', dataType: 'float32', shape: [1,24,64,64] }
+    ],
+    build: function(builder, weights) {
+      const input = builder.input('input', { dataType: 'float32', shape: [1,128,128,3] });
+      const w408 = constantFromWeights(builder, weights, 'const_fold_opt__408', 'float32', [24,3,5,5]);
+      const w440 = constantFromWeights(builder, weights, 'const_fold_opt__440', 'float32', [24]);
+      const w479 = constantFromWeights(builder, weights, 'const_fold_opt__479', 'float32', [24,1,3,3]);
+      const w398 = constantFromWeights(builder, weights, 'const_fold_opt__398', 'float32', [24]);
+      const w397 = constantFromWeights(builder, weights, 'const_fold_opt__397', 'float32', [24,24,1,1]);
+      const w381 = constantFromWeights(builder, weights, 'const_fold_opt__381', 'float32', [24]);
+      const t = builder.transpose(input, { permutation: [0, 3, 1, 2] });
+      const r = builder.reshape(t, [1, 3, 128, 128]);
+      const c = builder.conv2d(r, w408, { padding: [1, 2, 1, 2], strides: [2, 2], bias: w440 });
+      const a = builder.relu(c);
+      const rd = builder.reshape(a, [1, 24, 64, 64]);
+      const d = builder.conv2d(rd, w479, { padding: [1, 1, 1, 1], groups: 24, bias: w398 });
+      const c1 = builder.conv2d(d, w397, { bias: w381 });
+      const out = builder.add(a, c1);
+      return { output: out };
+    }
+  },
+  {
+    id: 'group7',
+    label: 'Group 7 (9 ops)',
+    desc: '... + Relu (after skip add)',
+    ops: ['transpose', 'reshape', 'conv2d', 'relu', 'reshape_dw', 'depthwise_conv2d', 'conv2d_1x1', 'add_1', 'relu_1'],
+    inputs: [
+      { name: 'input', dataType: 'float32', shape: [1,128,128,3] }
+    ],
+    outputs: [
+      { name: 'output', dataType: 'float32', shape: [1,24,64,64] }
+    ],
+    build: function(builder, weights) {
+      const input = builder.input('input', { dataType: 'float32', shape: [1,128,128,3] });
+      const w408 = constantFromWeights(builder, weights, 'const_fold_opt__408', 'float32', [24,3,5,5]);
+      const w440 = constantFromWeights(builder, weights, 'const_fold_opt__440', 'float32', [24]);
+      const w479 = constantFromWeights(builder, weights, 'const_fold_opt__479', 'float32', [24,1,3,3]);
+      const w398 = constantFromWeights(builder, weights, 'const_fold_opt__398', 'float32', [24]);
+      const w397 = constantFromWeights(builder, weights, 'const_fold_opt__397', 'float32', [24,24,1,1]);
+      const w381 = constantFromWeights(builder, weights, 'const_fold_opt__381', 'float32', [24]);
+      const t = builder.transpose(input, { permutation: [0, 3, 1, 2] });
+      const r = builder.reshape(t, [1, 3, 128, 128]);
+      const c = builder.conv2d(r, w408, { padding: [1, 2, 1, 2], strides: [2, 2], bias: w440 });
+      const a = builder.relu(c);
+      const rd = builder.reshape(a, [1, 24, 64, 64]);
+      const d = builder.conv2d(rd, w479, { padding: [1, 1, 1, 1], groups: 24, bias: w398 });
+      const c1 = builder.conv2d(d, w397, { bias: w381 });
+      const add_out = builder.add(a, c1);
+      const out = builder.relu(add_out);
+      return { output: out };
+    }
+  },
+  {
+    id: 'group8',
+    label: 'Group 8 (11 ops)',
+    desc: '... + Reshape + Depthwise Conv2d 3×3 g24',
+    ops: ['transpose', 'reshape', 'conv2d', 'relu', 'reshape_dw', 'depthwise_conv2d', 'conv2d_1x1', 'add_1', 'relu_1', 'reshape_dw2', 'depthwise_conv2d_1'],
+    inputs: [
+      { name: 'input', dataType: 'float32', shape: [1,128,128,3] }
+    ],
+    outputs: [
+      { name: 'output', dataType: 'float32', shape: [1,24,64,64] }
+    ],
+    build: function(builder, weights) {
+      const input = builder.input('input', { dataType: 'float32', shape: [1,128,128,3] });
+      const w408 = constantFromWeights(builder, weights, 'const_fold_opt__408', 'float32', [24,3,5,5]);
+      const w440 = constantFromWeights(builder, weights, 'const_fold_opt__440', 'float32', [24]);
+      const w479 = constantFromWeights(builder, weights, 'const_fold_opt__479', 'float32', [24,1,3,3]);
+      const w398 = constantFromWeights(builder, weights, 'const_fold_opt__398', 'float32', [24]);
+      const w397 = constantFromWeights(builder, weights, 'const_fold_opt__397', 'float32', [24,24,1,1]);
+      const w381 = constantFromWeights(builder, weights, 'const_fold_opt__381', 'float32', [24]);
+      const w483 = constantFromWeights(builder, weights, 'const_fold_opt__483', 'float32', [24,1,3,3]);
+      const t = builder.transpose(input, { permutation: [0, 3, 1, 2] });
+      const r = builder.reshape(t, [1, 3, 128, 128]);
+      const c = builder.conv2d(r, w408, { padding: [1, 2, 1, 2], strides: [2, 2], bias: w440 });
+      const a = builder.relu(c);
+      const rd = builder.reshape(a, [1, 24, 64, 64]);
+      const d = builder.conv2d(rd, w479, { padding: [1, 1, 1, 1], groups: 24, bias: w398 });
+      const c1 = builder.conv2d(d, w397, { bias: w381 });
+      const add_out = builder.add(a, c1);
+      const r1 = builder.relu(add_out);
+      const rd2 = builder.reshape(r1, [1, 24, 64, 64]);
+      const out = builder.conv2d(rd2, w483, { padding: [1, 1, 1, 1], groups: 24, bias: w398 });
+      return { output: out };
+    }
+  },
+  {
+    id: 'group9',
+    label: 'Group 9 (12 ops)',
+    desc: '... + Conv2d 1×1 (24→28)',
+    ops: ['transpose', 'reshape', 'conv2d', 'relu', 'reshape_dw', 'depthwise_conv2d', 'conv2d_1x1', 'add_1', 'relu_1', 'reshape_dw2', 'depthwise_conv2d_1', 'conv2d_2'],
+    inputs: [
+      { name: 'input', dataType: 'float32', shape: [1,128,128,3] }
+    ],
+    outputs: [
+      { name: 'output', dataType: 'float32', shape: [1,28,64,64] }
+    ],
+    build: function(builder, weights) {
+      const input = builder.input('input', { dataType: 'float32', shape: [1,128,128,3] });
+      const w408 = constantFromWeights(builder, weights, 'const_fold_opt__408', 'float32', [24,3,5,5]);
+      const w440 = constantFromWeights(builder, weights, 'const_fold_opt__440', 'float32', [24]);
+      const w479 = constantFromWeights(builder, weights, 'const_fold_opt__479', 'float32', [24,1,3,3]);
+      const w398 = constantFromWeights(builder, weights, 'const_fold_opt__398', 'float32', [24]);
+      const w397 = constantFromWeights(builder, weights, 'const_fold_opt__397', 'float32', [24,24,1,1]);
+      const w381 = constantFromWeights(builder, weights, 'const_fold_opt__381', 'float32', [24]);
+      const w483 = constantFromWeights(builder, weights, 'const_fold_opt__483', 'float32', [24,1,3,3]);
+      const w471 = constantFromWeights(builder, weights, 'const_fold_opt__471', 'float32', [28,24,1,1]);
+      const w330 = constantFromWeights(builder, weights, 'const_fold_opt__330', 'float32', [28]);
+      const t = builder.transpose(input, { permutation: [0, 3, 1, 2] });
+      const r = builder.reshape(t, [1, 3, 128, 128]);
+      const c = builder.conv2d(r, w408, { padding: [1, 2, 1, 2], strides: [2, 2], bias: w440 });
+      const a = builder.relu(c);
+      const rd = builder.reshape(a, [1, 24, 64, 64]);
+      const d = builder.conv2d(rd, w479, { padding: [1, 1, 1, 1], groups: 24, bias: w398 });
+      const c1 = builder.conv2d(d, w397, { bias: w381 });
+      const add_out = builder.add(a, c1);
+      const r1 = builder.relu(add_out);
+      const rd2 = builder.reshape(r1, [1, 24, 64, 64]);
+      const dw1 = builder.conv2d(rd2, w483, { padding: [1, 1, 1, 1], groups: 24, bias: w398 });
+      const out = builder.conv2d(dw1, w471, { bias: w330 });
+      return { output: out };
+    }
+  },
+  {
+    id: 'group10',
+    label: 'Group 10 (10 ops)',
+    desc: '... + Pad (0→4 ch, same branch)',
+    ops: ['transpose', 'reshape', 'conv2d', 'relu', 'reshape_dw', 'depthwise_conv2d', 'conv2d_1x1', 'add_1', 'relu_1', 'pad'],
+    inputs: [
+      { name: 'input', dataType: 'float32', shape: [1,128,128,3] }
+    ],
+    outputs: [
+      { name: 'output', dataType: 'float32', shape: [1,28,64,64] }
+    ],
+    build: function(builder, weights) {
+      const input = builder.input('input', { dataType: 'float32', shape: [1,128,128,3] });
+      const w408 = constantFromWeights(builder, weights, 'const_fold_opt__408', 'float32', [24,3,5,5]);
+      const w440 = constantFromWeights(builder, weights, 'const_fold_opt__440', 'float32', [24]);
+      const w479 = constantFromWeights(builder, weights, 'const_fold_opt__479', 'float32', [24,1,3,3]);
+      const w398 = constantFromWeights(builder, weights, 'const_fold_opt__398', 'float32', [24]);
+      const w397 = constantFromWeights(builder, weights, 'const_fold_opt__397', 'float32', [24,24,1,1]);
+      const w381 = constantFromWeights(builder, weights, 'const_fold_opt__381', 'float32', [24]);
+      const t = builder.transpose(input, { permutation: [0, 3, 1, 2] });
+      const r = builder.reshape(t, [1, 3, 128, 128]);
+      const c = builder.conv2d(r, w408, { padding: [1, 2, 1, 2], strides: [2, 2], bias: w440 });
+      const a = builder.relu(c);
+      const rd = builder.reshape(a, [1, 24, 64, 64]);
+      const d = builder.conv2d(rd, w479, { padding: [1, 1, 1, 1], groups: 24, bias: w398 });
+      const c1 = builder.conv2d(d, w397, { bias: w381 });
+      const add_out = builder.add(a, c1);
+      const r1 = builder.relu(add_out);
+      const out = builder.pad(r1, [0,0,0,0], [0,4,0,0]);
+      return { output: out };
+    }
+  },
+  {
+    id: 'group11',
+    label: 'Group 11 (16 ops)',
+    desc: 'Full path to first MaxPool (including both skip branches)',
+    ops: ['transpose', 'reshape', 'conv2d', 'relu', 'reshape_dw', 'depthwise_conv2d', 'conv2d_1x1', 'add_1', 'relu_1', 'reshape_dw2', 'depthwise_conv2d_1', 'conv2d_2', 'pad', 'add_2', 'relu_2', 'maxpool'],
+    inputs: [
+      { name: 'input', dataType: 'float32', shape: [1,128,128,3] }
+    ],
+    outputs: [
+      { name: 'output', dataType: 'float32', shape: [1,28,32,32] }
+    ],
+    build: function(builder, weights) {
+      const input = builder.input('input', { dataType: 'float32', shape: [1,128,128,3] });
+      const w408 = constantFromWeights(builder, weights, 'const_fold_opt__408', 'float32', [24,3,5,5]);
+      const w440 = constantFromWeights(builder, weights, 'const_fold_opt__440', 'float32', [24]);
+      const w479 = constantFromWeights(builder, weights, 'const_fold_opt__479', 'float32', [24,1,3,3]);
+      const w398 = constantFromWeights(builder, weights, 'const_fold_opt__398', 'float32', [24]);
+      const w397 = constantFromWeights(builder, weights, 'const_fold_opt__397', 'float32', [24,24,1,1]);
+      const w381 = constantFromWeights(builder, weights, 'const_fold_opt__381', 'float32', [24]);
+      const w483 = constantFromWeights(builder, weights, 'const_fold_opt__483', 'float32', [24,1,3,3]);
+      const w471 = constantFromWeights(builder, weights, 'const_fold_opt__471', 'float32', [28,24,1,1]);
+      const w330 = constantFromWeights(builder, weights, 'const_fold_opt__330', 'float32', [28]);
+      const t = builder.transpose(input, { permutation: [0, 3, 1, 2] });
+      const r = builder.reshape(t, [1, 3, 128, 128]);
+      const c = builder.conv2d(r, w408, { padding: [1, 2, 1, 2], strides: [2, 2], bias: w440 });
+      const a = builder.relu(c);
+      const rd = builder.reshape(a, [1, 24, 64, 64]);
+      const d = builder.conv2d(rd, w479, { padding: [1, 1, 1, 1], groups: 24, bias: w398 });
+      const c1 = builder.conv2d(d, w397, { bias: w381 });
+      const add_out = builder.add(a, c1);
+      const r1 = builder.relu(add_out);
+      const rd2 = builder.reshape(r1, [1, 24, 64, 64]);
+      const dw1 = builder.conv2d(rd2, w483, { padding: [1, 1, 1, 1], groups: 24, bias: w398 });
+      const c2 = builder.conv2d(dw1, w471, { bias: w330 });
+      const pad_out = builder.pad(r1, [0,0,0,0], [0,4,0,0]);
+      const add2_out = builder.add(pad_out, c2);
+      const r2 = builder.relu(add2_out);
+      const out = builder.maxPool2d(r2, { windowDimensions: [2, 2], strides: [2, 2] });
+      return { output: out };
+    }
+  }
+];
+
+function constantFromWeights(builder, weights, name, dataType, shape) {
+  const sl = weights.getSlice(name);
+  const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+  if (dataType === 'float32') return builder.constant({ dataType, shape }, new Float32Array(buf));
+  if (dataType === 'int64') return builder.constant({ dataType, shape }, new BigInt64Array(buf));
+  throw new Error('Unsupported type: ' + dataType);
+}
+
+// ---------------------------------------------------------------------------
+// Operator graph (Netron-like visualization)
+// ---------------------------------------------------------------------------
+
+const OP_COLORS = {
+  input:   { fill: '#dbeafe', stroke: '#3b82f6', text: '#1e40af' },
+  transpose: { fill: '#ede9fe', stroke: '#8b5cf6', text: '#5b21b6' },
+  conv:    { fill: '#ffedd5', stroke: '#f97316', text: '#9a3412' },
+  activation: { fill: '#d1fae5', stroke: '#10b981', text: '#065f46' },
+  add:     { fill: '#dbeafe', stroke: '#3b82f6', text: '#1e40af' },
+  pad:     { fill: '#f3f4f6', stroke: '#9ca3af', text: '#4b5563' },
+  pool:    { fill: '#ccfbf1', stroke: '#14b8a6', text: '#115e59' },
+  reshape: { fill: '#fce7f3', stroke: '#ec4899', text: '#9d174d' },
+  concat:  { fill: '#fef3c7', stroke: '#f59e0b', text: '#92400e' }
+};
+const ACTIVE_COLOR = { fill: '#dbeafe', stroke: '#0052cc', text: '#1e40af' };
+const DIM_OPACITY = 0.35;
+
+// Maps group `ops` short names to graph node IDs
+const OP_TO_NODE = {
+  'transpose': 'transpose',
+  'reshape': 'reshape',
+  'conv2d': 'conv2d',
+  'relu': 'relu',
+  'reshape_dw': 'reshape_2',
+  'depthwise_conv2d': 'depthwise_conv2d',
+  'conv2d_1x1': 'conv2d_1',
+  'add_1': 'add_1',
+  'relu_1': 'relu_1',
+  'reshape_dw2': 'reshape_3',
+  'depthwise_conv2d_1': 'depthwise_conv2d_1',
+  'conv2d_2': 'conv2d_2',
+  'pad': 'pad_1',
+  'add_2': 'add_2',
+  'relu_2': 'relu_2',
+  'maxpool': 'maxpool'
+};
+
+const MODEL_GRAPH = {
+  nodes: [
+    { id: 'input',       label: 'input',       type: 'input',       detail: '[1,128,128,3]' },
+    { id: 'transpose',   label: 'Transpose',   type: 'transpose',   detail: 'NHWC→NCHW [0,3,1,2]' },
+    { id: 'reshape',     label: 'Reshape',     type: 'reshape',     detail: '[1,3,128,128]' },
+    { id: 'conv2d',      label: 'Conv2D',      type: 'conv',        detail: '3→24 5×5 s2' },
+    { id: 'relu',        label: 'ReLU',        type: 'activation',  detail: '' },
+    { id: 'reshape_2',   label: 'Reshape',     type: 'reshape',     detail: '[1,24,64,64]' },
+    { id: 'depthwise_conv2d', label: 'Depthwise Conv2D', type: 'conv', detail: '24ch 3×3 g24' },
+    { id: 'conv2d_1',    label: 'Conv2D 1×1',  type: 'conv',        detail: '24→24' },
+    { id: 'add_1',       label: 'Add',         type: 'add',         detail: 'skip' },
+    { id: 'relu_1',      label: 'ReLU',        type: 'activation',  detail: '' },
+    { id: 'reshape_3',   label: 'Reshape',     type: 'reshape',     detail: '[1,24,64,64]' },
+    { id: 'depthwise_conv2d_1', label: 'Depthwise Conv2D', type: 'conv', detail: '24ch 3×3 g24' },
+    { id: 'conv2d_2',    label: 'Conv2D 1×1',  type: 'conv',        detail: '24→28' },
+    { id: 'pad_1',       label: 'Pad',         type: 'pad',         detail: '0→4ch' },
+    { id: 'add_2',       label: 'Add',         type: 'add',         detail: 'skip' },
+    { id: 'relu_2',      label: 'ReLU',        type: 'activation',  detail: '' },
+    { id: 'maxpool',     label: 'MaxPool',     type: 'pool',        detail: '2×2 s2' }
+  ],
+  edges: [
+    { from: 'input',    to: 'transpose' },
+    { from: 'transpose', to: 'reshape' },
+    { from: 'reshape', to: 'conv2d' },
+    { from: 'conv2d',   to: 'relu' },
+    { from: 'relu',     to: 'reshape_2' },
+    { from: 'reshape_2', to: 'depthwise_conv2d' },
+    { from: 'depthwise_conv2d', to: 'conv2d_1' },
+    { from: 'relu',     to: 'add_1' },
+    { from: 'conv2d_1', to: 'add_1' },
+    { from: 'add_1',    to: 'relu_1' },
+    { from: 'relu_1',   to: 'reshape_3' },
+    { from: 'reshape_3', to: 'depthwise_conv2d_1' },
+    { from: 'depthwise_conv2d_1', to: 'conv2d_2' },
+    { from: 'relu_1',   to: 'pad_1' },
+    { from: 'pad_1',    to: 'add_2' },
+    { from: 'conv2d_2', to: 'add_2' },
+    { from: 'add_2',    to: 'relu_2' },
+    { from: 'relu_2',   to: 'maxpool' }
+  ]
+};
+
+function layoutGraph(graph) {
+  const layers = {};
+  const visited = {};
+  function getLayer(id) {
+    if (visited[id] !== undefined) return visited[id];
+    const node = graph.nodes.find(n => n.id === id);
+    if (!node) return 0;
+    const incoming = graph.edges.filter(e => e.to === id);
+    if (incoming.length === 0) { visited[id] = 0; return 0; }
+    let maxLayer = 0;
+    for (const e of incoming) maxLayer = Math.max(maxLayer, getLayer(e.from) + 1);
+    visited[id] = maxLayer;
+    return maxLayer;
+  }
+  for (const node of graph.nodes) getLayer(node.id);
+  for (const node of graph.nodes) {
+    const l = visited[node.id];
+    if (!layers[l]) layers[l] = [];
+    layers[l].push(node.id);
+  }
+
+  const NODE_W = 130, NODE_H = 46, GAP_X = 40, GAP_Y = 16;
+  const sortedLayers = Object.keys(layers).sort((a, b) => a - b);
+  const positions = {};
+  for (const l of sortedLayers) {
+    const ids = layers[l];
+    const x = +l * (NODE_W + GAP_X) + 10;
+    let y = 10;
+    for (const id of ids) {
+      positions[id] = { x, y };
+      y += NODE_H + GAP_Y;
+    }
+  }
+  return { positions, nodeW: NODE_W, nodeH: NODE_H, width: sortedLayers.length * (NODE_W + GAP_X) + 20, height: Math.max(...sortedLayers.map(l => {
+    const ids = layers[l];
+    return ids.length * (NODE_H + GAP_Y) + 10;
+  })) };
+}
+
+function renderGraph(container, graph, activeNodeIds) {
+  const { positions, nodeW, nodeH, width, height } = layoutGraph(graph);
+  const svgNS = 'http://www.w3.org/2000/svg';
+
+  let svg = container.querySelector('svg');
+  if (!svg) {
+    svg = document.createElementNS(svgNS, 'svg');
+    container.appendChild(svg);
+  }
+  svg.setAttribute('width', Math.max(width, 600));
+  svg.setAttribute('height', Math.max(height, 60));
+  svg.setAttribute('viewBox', '0 0 ' + Math.max(width, 600) + ' ' + Math.max(height, 60));
+  svg.innerHTML = '';
+
+  // Arrow marker def
+  const defs = document.createElementNS(svgNS, 'defs');
+  const marker = document.createElementNS(svgNS, 'marker');
+  marker.setAttribute('id', 'arrowhead');
+  marker.setAttribute('markerWidth', '8');
+  marker.setAttribute('markerHeight', '6');
+  marker.setAttribute('refX', '8');
+  marker.setAttribute('refY', '3');
+  marker.setAttribute('orient', 'auto');
+  const arrow = document.createElementNS(svgNS, 'polygon');
+  arrow.setAttribute('points', '0 0, 8 3, 0 6');
+  arrow.setAttribute('fill', '#999');
+  marker.appendChild(arrow);
+  defs.appendChild(marker);
+  svg.appendChild(defs);
+
+  // Edges
+  for (const edge of graph.edges) {
+    const from = positions[edge.from];
+    const to = positions[edge.to];
+    if (!from || !to) continue;
+    const x1 = from.x + nodeW;
+    const y1 = from.y + nodeH / 2;
+    const x2 = to.x;
+    const y2 = to.y + nodeH / 2;
+    const active = activeNodeIds.has(edge.from) && activeNodeIds.has(edge.to);
+    const path = document.createElementNS(svgNS, 'path');
+    const midX = (x1 + x2) / 2;
+    path.setAttribute('d', 'M' + x1 + ',' + y1 + ' C' + midX + ',' + y1 + ' ' + midX + ',' + y2 + ' ' + x2 + ',' + y2);
+    path.setAttribute('class', active ? 'graph-edge graph-edge-active' : 'graph-edge');
+    if (!active) path.setAttribute('opacity', DIM_OPACITY);
+    path.setAttribute('marker-end', 'url(#arrowhead)');
+    svg.appendChild(path);
+  }
+
+  // Nodes
+  for (const node of graph.nodes) {
+    const pos = positions[node.id];
+    if (!pos) continue;
+    const active = activeNodeIds.has(node.id);
+    const colors = active ? (OP_COLORS[node.type] || OP_COLORS.conv) : OP_COLORS[node.type] || OP_COLORS.conv;
+    const g = document.createElementNS(svgNS, 'g');
+    g.setAttribute('class', 'graph-node');
+    if (!active) g.setAttribute('opacity', DIM_OPACITY);
+
+    const rect = document.createElementNS(svgNS, 'rect');
+    rect.setAttribute('x', pos.x);
+    rect.setAttribute('y', pos.y);
+    rect.setAttribute('width', nodeW);
+    rect.setAttribute('height', nodeH);
+    rect.setAttribute('rx', '6');
+    rect.setAttribute('ry', '6');
+    rect.setAttribute('fill', active ? ACTIVE_COLOR.fill : colors.fill);
+    rect.setAttribute('stroke', active ? ACTIVE_COLOR.stroke : colors.stroke);
+    g.appendChild(rect);
+
+    const label = document.createElementNS(svgNS, 'text');
+    label.setAttribute('x', pos.x + nodeW / 2);
+    label.setAttribute('y', pos.y + nodeH / 2 - (node.detail ? 4 : 0));
+    label.setAttribute('text-anchor', 'middle');
+    label.setAttribute('dominant-baseline', 'central');
+    label.setAttribute('fill', active ? ACTIVE_COLOR.text : colors.text);
+    label.setAttribute('font-size', '11');
+    label.setAttribute('font-weight', '600');
+    label.textContent = node.label;
+    g.appendChild(label);
+
+    if (node.detail) {
+      const detail = document.createElementNS(svgNS, 'text');
+      detail.setAttribute('x', pos.x + nodeW / 2);
+      detail.setAttribute('y', pos.y + nodeH / 2 + 13);
+      detail.setAttribute('text-anchor', 'middle');
+      detail.setAttribute('dominant-baseline', 'central');
+      detail.setAttribute('fill', active ? ACTIVE_COLOR.text : colors.text);
+      detail.setAttribute('font-size', '9');
+      detail.setAttribute('opacity', '0.75');
+      detail.textContent = node.detail;
+      g.appendChild(detail);
+    }
+
+    svg.appendChild(g);
+  }
+}
+
+function updateGraph() {
+  const g = GROUPS[+groupSelect.value];
+  const activeNodeIds = new Set();
+  for (const op of g.ops) {
+    const nid = OP_TO_NODE[op];
+    if (nid) activeNodeIds.add(nid);
+  }
+  // Always show 'input' as context
+  activeNodeIds.add('input');
+  renderGraph(document.getElementById('graphContainer'), MODEL_GRAPH, activeNodeIds);
+}
+
+function updateCode() {
+  const g = GROUPS[+groupSelect.value];
+  const el = document.getElementById('codeContainer');
+  // Extract build function source, strip padding whitespace
+  let src = g.build.toString();
+  // Remove 'function(builder, weights) { ... }' wrapper — show only the body
+  const bodyMatch = src.match(/\{([\s\S]*)\}/);
+  if (bodyMatch) {
+    src = bodyMatch[1].replace(/^ {6}/gm, '').trim();
+  }
+  el.textContent = src;
+}
+
+// ---------------------------------------------------------------------------
+// UI
+// ---------------------------------------------------------------------------
+
+let _lastInputsData = null;
+let _lastResults = null;
+
+const groupSelect = document.getElementById('groupSelect');
+const deviceSelect = document.getElementById('deviceSelect');
+const refDeviceSelect = document.getElementById('refDeviceSelect');
+const statusEl = document.getElementById('status');
+const groupInfo = document.getElementById('groupInfo');
+const opList = document.getElementById('opList');
+const resultsEl = document.getElementById('results');
+const resultsCard = document.getElementById('resultsCard');
+const allResultsCard = document.getElementById('allResultsCard');
+const summaryBody = document.getElementById('summaryBody');
+
+GROUPS.forEach((g, i) => {
+  const opt = document.createElement('option');
+  opt.value = i;
+  opt.textContent = g.label;
+  groupSelect.appendChild(opt);
+});
+
+function updateGroupInfo() {
+  const g = GROUPS[+groupSelect.value];
+  groupInfo.textContent = g.desc;
+  opList.textContent = 'Operators: ' + g.ops.join(' → ') +
+    '  |  Input: ' + JSON.stringify(g.inputs[0].shape) +
+    '  |  Output: ' + JSON.stringify(g.outputs[0].shape);
+}
+groupSelect.addEventListener('change', () => { updateGroupInfo(); updateGraph(); updateCode(); });
+updateGroupInfo();
+updateGraph();
+updateCode();
+
+const fillSelect = document.getElementById('fillSelect');
+const fixedValueInput = document.getElementById('fixedValue');
+fillSelect.addEventListener('change', () => {
+  fixedValueInput.style.display = fillSelect.value === 'fixed' ? '' : 'none';
+});
+
+function makeInputData(size) {
+  const data = new Float32Array(size);
+  if (fillSelect.value === 'fixed') {
+    const v = parseFloat(fixedValueInput.value) || 0;
+    data.fill(v);
+  } else {
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  }
+  return data;
+}
+
+// ---------------------------------------------------------------------------
+// Cross-device comparison helpers
+// ---------------------------------------------------------------------------
+
+function computeDiff(ref, test) {
+  if (ref.length !== test.length) return { match: false, error: 'Shape mismatch: ref=' + ref.length + ' test=' + test.length };
+  let maxAbs = 0, sumAbs = 0, maxRel = 0;
+  for (let i = 0; i < ref.length; i++) {
+    const d = Math.abs(ref[i] - test[i]);
+    if (d > maxAbs) maxAbs = d;
+    sumAbs += d;
+    const denom = Math.max(Math.abs(ref[i]), Math.abs(test[i]), 1e-12);
+    const r = d / denom;
+    if (r > maxRel) maxRel = r;
+  }
+  const meanAbs = sumAbs / ref.length;
+  let match;
+  if (maxAbs < 1e-6) match = 'pass';
+  else if (maxAbs < 1e-3) match = 'warn';
+  else match = 'fail';
+  return { match, maxAbs, meanAbs, maxRel, len: ref.length };
+}
+
+function diffClass(match) { return match === 'pass' ? 'pass' : match === 'warn' ? 'warn' : 'fail'; }
+function badgeHtml(match) {
+  const cls = match === 'pass' ? 'badge-pass' : match === 'warn' ? 'badge-warn' : 'badge-fail';
+  return '<span class="badge ' + cls + '">' + match.toUpperCase() + '</span>';
+}
+
+async function execGroup(group, deviceType, weights, inputDataMap) {
+  const context = await navigator.ml.createContext({ deviceType });
+  const builder = new MLGraphBuilder(context);
+  const buildStart = performance.now();
+  const namedOutputs = group.build(builder, weights);
+  const outputShapes = {};
+  for (const [name, operand] of Object.entries(namedOutputs)) {
+    outputShapes[name] = Array.from(operand.shape);
+  }
+  const graph = await builder.build(namedOutputs);
+  const buildTime = performance.now() - buildStart;
+
+  const inputTensors = {};
+  for (const info of group.inputs) {
+    const data = inputDataMap[info.name];
+    const tensor = await context.createTensor({
+      dataType: info.dataType, shape: info.shape, writable: true
+    });
+    context.writeTensor(tensor, data);
+    inputTensors[info.name] = tensor;
+  }
+  const outputTensors = {};
+  for (const info of group.outputs) {
+    outputTensors[info.name] = await context.createTensor({
+      dataType: info.dataType, shape: outputShapes[info.name], readable: true
+    });
+  }
+  const t0 = performance.now();
+  context.dispatch(graph, inputTensors, outputTensors);
+  const inferTime = performance.now() - t0;
+
+  const results = {};
+  for (const info of group.outputs) {
+    const buf = await context.readTensor(outputTensors[info.name]);
+    results[info.name] = new Float32Array(buf);
+  }
+
+  // Benchmark runs
+  const NUM_RUNS = 20;
+  const runTimes = [];
+  for (let i = 0; i < NUM_RUNS; i++) {
+    const tb = performance.now();
+    context.dispatch(graph, inputTensors, outputTensors);
+    await context.readTensor(outputTensors[group.outputs[0].name]);
+    runTimes.push(performance.now() - tb);
+  }
+  const avgTime = runTimes.reduce((a, b) => a + b, 0) / NUM_RUNS;
+
+  return { results, outputShapes, buildTime, inferTime, avgTime };
+}
+
+// ---------------------------------------------------------------------------
+// Single group: run on device, compare with reference
+// ---------------------------------------------------------------------------
+
+async function run() {
+  const runBtn = document.getElementById('runBtn');
+  const idx = +groupSelect.value;
+  const group = GROUPS[idx];
+  const deviceType = deviceSelect.value;
+  const refDeviceType = refDeviceSelect.value;
+  const compare = deviceType !== refDeviceType;
+
+  try {
+    runBtn.disabled = true;
+    statusEl.className = 'status info';
+
+    if (!navigator.ml) throw new Error('WebNN is not supported in this browser.');
+
+    statusEl.textContent = 'Loading weights...';
+    const weights = await WeightsFile.load(
+      '../face_detector-webnn/face_detector.weights',
+      '../face_detector-webnn/face_detector.manifest.json'
+    );
+
+    // Create input data once, use for both devices
+    const inputDataMap = {};
+    for (const info of group.inputs) {
+      const size = info.shape.reduce((a, b) => a * b, 1);
+      inputDataMap[info.name] = makeInputData(size);
+    }
+
+    statusEl.textContent = 'Running on ' + deviceType.toUpperCase() + '...';
+    const main = await execGroup(group, deviceType, weights, inputDataMap);
+
+    let ref = null;
+    if (compare) {
+      statusEl.textContent = 'Running on reference ' + refDeviceType.toUpperCase() + '...';
+      ref = await execGroup(group, refDeviceType, weights, inputDataMap);
+    }
+
+    _lastInputsData = inputDataMap;
+    _lastResults = main.results;
+
+    let statusLine = group.label + ' | ' + deviceType.toUpperCase() + ' build: ' + main.buildTime.toFixed(2) + 'ms infer: ' + main.avgTime.toFixed(2) + 'ms avg';
+    if (compare && ref) {
+      statusLine += ' | ' + refDeviceType.toUpperCase() + ' infer: ' + ref.avgTime.toFixed(2) + 'ms avg';
+    }
+    statusEl.className = 'status success';
+    statusEl.textContent = statusLine;
+
+    // Render results
+    resultsCard.style.display = '';
+    let html = '';
+    for (const info of group.inputs) {
+      const data = inputDataMap[info.name];
+      const preview = Array.from(data.slice(0, 16)).map(v => v.toFixed(6)).join(', ');
+      const copyStr = JSON.stringify(Array.from(data));
+      html += '<div><strong>' + info.name + ' (input)</strong> shape=' + JSON.stringify(info.shape) + ' (' + info.dataType + ') <button onclick="navigator.clipboard.writeText(\'' + copyStr.replace(/'/g, "\\'") + '\')" style="font-size:0.7rem;padding:0 4px;vertical-align:middle;">copy</button></div>';
+      html += '<pre>[' + preview + (data.length > 16 ? ', ...' : '') + ']</pre>';
+    }
+
+    for (const info of group.outputs) {
+      const name = info.name;
+      const data = main.results[name];
+      const shape = main.outputShapes[name];
+      const preview = Array.from(data.slice(0, 16)).map(v => v.toFixed(6)).join(', ');
+      const copyStr = JSON.stringify(Array.from(data));
+
+      html += '<div style="margin-top:0.5rem;"><strong>' + name + ' (output)</strong> shape=' + JSON.stringify(shape) + ' (' + info.dataType + ')</div>';
+
+      // Main device output
+      html += '<div style="font-size:0.8rem;color:#555;">' + deviceType.toUpperCase() + ' output <button onclick="navigator.clipboard.writeText(\'' + copyStr.replace(/'/g, "\\'") + '\')" style="font-size:0.7rem;padding:0 4px;vertical-align:middle;">copy</button></div>';
+      html += '<pre>[' + preview + (data.length > 16 ? ', ...' : '') + ']</pre>';
+
+      if (compare && ref) {
+        const refData = ref.results[name];
+        const refPreview = Array.from(refData.slice(0, 16)).map(v => v.toFixed(6)).join(', ');
+        const refCopyStr = JSON.stringify(Array.from(refData));
+        html += '<div style="font-size:0.8rem;color:#555;">' + refDeviceType.toUpperCase() + ' output (ref) <button onclick="navigator.clipboard.writeText(\'' + refCopyStr.replace(/'/g, "\\'") + '\')" style="font-size:0.7rem;padding:0 4px;vertical-align:middle;">copy</button></div>';
+        html += '<pre>[' + refPreview + (refData.length > 16 ? ', ...' : '') + ']</pre>';
+
+        const diff = computeDiff(refData, data);
+        if (diff.error) {
+          html += '<div class="diff-fail">' + diff.error + '</div>';
+        } else {
+          const dc = diffClass(diff.match);
+          html += '<div style="font-size:0.85rem;" class="diff-' + dc + '">';
+          html += badgeHtml(diff.match) + ' ';
+          html += 'max|Δ|=' + diff.maxAbs.toExponential(4) + ' mean|Δ|=' + diff.meanAbs.toExponential(4) + ' maxRel=' + diff.maxRel.toExponential(4);
+          html += '</div>';
+        }
+      }
+    }
+    resultsEl.innerHTML = html;
+
+  } catch (err) {
+    statusEl.className = 'status error';
+    statusEl.textContent = 'Error: ' + err.message;
+    console.error(err);
+  } finally {
+    runBtn.disabled = false;
+  }
+}
+
+function copyResults() {
+  if (!_lastInputsData || !_lastResults) return;
+  const group = GROUPS[+groupSelect.value];
+  let text = '';
+  for (const info of group.inputs) {
+    const data = _lastInputsData[info.name];
+    text += info.name + ' (input) shape=' + JSON.stringify(info.shape) + ' ' + info.dataType + '\n';
+    text += '[' + Array.from(data).map(v => v.toFixed(6)).join(', ') + ']\n\n';
+  }
+  for (const info of group.outputs) {
+    const data = _lastResults[info.name];
+    text += info.name + ' (output) shape=' + JSON.stringify(info.shape) + ' ' + info.dataType + '\n';
+    text += '[' + Array.from(data).map(v => v.toFixed(6)).join(', ') + ']\n\n';
+  }
+  navigator.clipboard.writeText(text).catch(() => {});
+}
+
+// ---------------------------------------------------------------------------
+// Run All: compare every group across two devices
+// ---------------------------------------------------------------------------
+
+async function runAll() {
+  const runAllBtn = document.getElementById('runAllBtn');
+  const deviceType = deviceSelect.value;
+  const refDeviceType = refDeviceSelect.value;
+  const compare = deviceType !== refDeviceType;
+
+  try {
+    runAllBtn.disabled = true;
+    statusEl.className = 'status info';
+
+    if (!navigator.ml) throw new Error('WebNN is not supported in this browser.');
+
+    const weights = await WeightsFile.load(
+      '../face_detector-webnn/face_detector.weights',
+      '../face_detector-webnn/face_detector.manifest.json'
+    );
+
+    document.getElementById('thRef').style.display = compare ? '' : 'none';
+    document.getElementById('thDiff').style.display = compare ? '' : 'none';
+    document.getElementById('thMean').style.display = compare ? '' : 'none';
+    allResultsCard.style.display = '';
+    summaryBody.innerHTML = '';
+
+    let firstFailIdx = -1;
+
+    for (let idx = 0; idx < GROUPS.length; idx++) {
+      const group = GROUPS[idx];
+      statusEl.textContent = group.label + ' — running on ' + deviceType.toUpperCase() + '...';
+
+      const inputDataMap = {};
+      for (const info of group.inputs) {
+        const size = info.shape.reduce((a, b) => a * b, 1);
+        inputDataMap[info.name] = makeInputData(size);
+      }
+
+      const main = await execGroup(group, deviceType, weights, inputDataMap);
+
+      let ref = null;
+      if (compare) {
+        statusEl.textContent = group.label + ' — running on ref ' + refDeviceType.toUpperCase() + '...';
+        ref = await execGroup(group, refDeviceType, weights, inputDataMap);
+      }
+
+      const outShapeStr = JSON.stringify(main.outputShapes[group.outputs[0].name]);
+      const inShapeStr = JSON.stringify(group.inputs[0].shape);
+
+      const row = document.createElement('tr');
+      let diffHtml = '';
+      if (compare && ref) {
+        const outName = group.outputs[0].name;
+        const diff = computeDiff(ref.results[outName], main.results[outName]);
+        if (diff.error) {
+          diffHtml = '<td class="fail" colspan="2">' + diff.error + '</td>';
+        } else {
+          const dc = diffClass(diff.match);
+          const maxA = diff.maxAbs.toExponential(4);
+          const meanA = diff.meanAbs.toExponential(4);
+          diffHtml = '<td class="' + dc + '">' + badgeHtml(diff.match) + ' max|Δ|=' + maxA + '</td>' +
+                     '<td class="' + dc + '">mean|Δ|=' + meanA + '</td>';
+        }
+        if (firstFailIdx < 0 && diff.match === 'fail') firstFailIdx = idx;
+      } else {
+        diffHtml = '<td colspan="2">—</td>';
+      }
+
+      row.innerHTML =
+        '<td>' + group.label + '</td>' +
+        '<td>' + group.ops.join(' → ') + '</td>' +
+        '<td>' + inShapeStr + '</td>' +
+        '<td>' + outShapeStr + '</td>' +
+        '<td>' + main.buildTime.toFixed(2) + '</td>' +
+        '<td>' + main.avgTime.toFixed(2) + '</td>' +
+        (compare && ref ? '<td>' + ref.avgTime.toFixed(2) + '</td>' : '') +
+        diffHtml;
+      summaryBody.appendChild(row);
+    }
+
+    let statusMsg = 'All groups completed.';
+    if (compare) {
+      if (firstFailIdx >= 0) {
+        statusMsg += ' First significant deviation at ' + GROUPS[firstFailIdx].label + '.';
+      } else {
+        statusMsg += ' All outputs match between ' + deviceType.toUpperCase() + ' and ' + refDeviceType.toUpperCase() + '.';
+      }
+    }
+    statusEl.className = 'status success';
+    statusEl.textContent = statusMsg;
+
+  } catch (err) {
+    statusEl.className = 'status error';
+    statusEl.textContent = 'Error: ' + err.message;
+    console.error(err);
+  } finally {
+    runAllBtn.disabled = false;
+  }
+}
+  </script>
+</body>
+</html>

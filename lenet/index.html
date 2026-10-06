@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebNN LeNet — Handwritten Digit Recognition</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f5f5f5; color: #1a1a1a; padding: 1.5rem;
+    }
+    .container { max-width: 700px; margin: 0 auto; }
+    h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+    .subtitle { color: #666; font-size: 0.85rem; margin-bottom: 1rem; }
+
+    .card {
+      background: #fff; border-radius: 6px; padding: 1rem 1.25rem;
+      margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    .controls {
+      display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;
+    }
+    label { font-weight: 600; font-size: 0.85rem; }
+    select, button {
+      padding: 0.3rem 0.75rem; border: 1px solid #ddd;
+      border-radius: 4px; font-size: 0.85rem; cursor: pointer;
+    }
+    button {
+      background: rgba(0,47,167,1); color: #fff; border: none;
+      font-weight: 500;
+    }
+    button:hover { background: rgba(0,47,167,0.85); }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+
+    .status {
+      padding: 0.6rem 1rem; font-size: 0.85rem; border-radius: 4px;
+      margin-bottom: 0.75rem;
+    }
+    .status.info { background: #e3f2fd; border-left: 3px solid #2196F3; }
+    .status.success { background: #e9f8f0; border-left: 3px solid #068906; }
+    .status.error { background: #ffebee; border-left: 3px solid #f44336; }
+
+    .main-row { display: flex; gap: 1.5rem; align-items: flex-start; flex-wrap: wrap; }
+    .canvas-col { flex: 0 0 auto; }
+    .result-col { flex: 1; min-width: 200px; }
+
+    #visualCanvas {
+      background: #000; border-radius: 6px; cursor: crosshair;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15); touch-action: none;
+    }
+
+    .results-grid { display: grid; gap: 0.5rem; margin-top: 0.5rem; }
+    .result-row {
+      display: flex; align-items: center; padding: 0.4rem 0.6rem;
+      background: #fafafa; border-radius: 4px; border: 1px solid #eee;
+    }
+    .result-rank {
+      font-weight: 700; font-size: 1rem; width: 1.5rem;
+      color: rgba(0,47,167,1);
+    }
+    .result-digit {
+      font-weight: 700; font-size: 1.2rem; width: 1.5rem;
+      text-align: center; color: rgba(0,47,167,1);
+    }
+    .result-bar-wrap {
+      flex: 1; height: 14px; background: #eee;
+      border-radius: 7px; overflow: hidden; margin: 0 0.75rem;
+    }
+    .result-bar {
+      height: 100%; background: linear-gradient(90deg, rgba(0,47,167,1), rgba(0,47,167,0.6));
+      border-radius: 7px; transition: width 0.3s;
+    }
+    .result-pct { font-size: 0.8rem; font-weight: 600; width: 3.5rem; text-align: right; }
+
+    .timing { font-size: 0.8rem; color: #666; margin-top: 0.75rem; }
+    #resultsCard { display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>LeNet — Handwritten Digit Recognition</h1>
+    <p class="subtitle">Pure WebNN API (MLGraphBuilder) — draw a digit or upload an image</p>
+
+    <div class="card">
+      <div class="controls">
+        <label for="deviceSelect">Device:</label>
+        <select id="deviceSelect">
+          <option value="cpu">CPU</option>
+          <option value="gpu">GPU</option>
+          <option value="npu">NPU</option>
+        </select>
+        <button id="loadBtn" onclick="loadModel()">Load Model</button>
+        <input type="file" id="imageInput" accept="image/*" style="display:none" onchange="uploadImage(event)">
+        <button id="uploadBtn" onclick="document.getElementById('imageInput').click()" style="background:#555;">Upload Image</button>
+        <button id="predictBtn" onclick="predict()" disabled>Predict</button>
+        <button id="clearBtn" onclick="clearCanvas()" style="background:#666;">Clear</button>
+      </div>
+    </div>
+
+    <div id="status" class="status info">Ready. Click "Load Model" to start.</div>
+
+    <div class="card">
+      <div class="main-row">
+        <div class="canvas-col">
+          <canvas id="visualCanvas" width="280" height="280"></canvas>
+        </div>
+        <div class="result-col">
+          <div id="resultsCard">
+            <h3 style="margin-bottom:0.5rem;">Prediction</h3>
+            <div class="results-grid" id="predictions"></div>
+            <div class="timing" id="timingInfo"></div>
+            <div style="margin-top:0.75rem;">
+              <label style="cursor:pointer;font-size:0.8rem;">
+                <input type="checkbox" id="logToggle" onchange="toggleLog()" checked> Show op log
+              </label>
+              <pre id="logOutput" style="background:#1a1a2e;color:#a0ffa0;padding:0.5rem;border-radius:4px;font-size:0.7rem;max-height:300px;overflow-y:auto;white-space:pre-wrap;word-break:break-all;margin-top:0.25rem;"></pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ====== PEN (canvas drawing) ======
+    function Pen(canvas) {
+      this.canvas = canvas;
+      this.ctx = canvas.getContext('2d');
+      this.down = false;
+      this.cleared = true;
+      this.start = {};
+      var self = this;
+
+      canvas.addEventListener('mousedown', function(e) {
+        self.down = true;
+        self.start = self.getPos(e);
+      });
+      canvas.addEventListener('mouseup', function() {
+        self.down = false;
+      });
+      canvas.addEventListener('mousemove', function(e) {
+        if (self.down) {
+          var end = self.getPos(e);
+          self.drawLine(self.start, end);
+          self.start = end;
+        }
+      });
+      // Touch support
+      canvas.addEventListener('touchstart', function(e) {
+        e.preventDefault();
+        self.down = true;
+        self.start = self.getPos(e.touches[0]);
+      });
+      canvas.addEventListener('touchend', function() {
+        self.down = false;
+      });
+      canvas.addEventListener('touchmove', function(e) {
+        e.preventDefault();
+        if (self.down) {
+          var end = self.getPos(e.touches[0]);
+          self.drawLine(self.start, end);
+          self.start = end;
+        }
+      });
+    }
+    Pen.prototype.getPos = function(e) {
+      var r = this.canvas.getBoundingClientRect();
+      return {x: e.clientX - r.left, y: e.clientY - r.top};
+    };
+    Pen.prototype.drawLine = function(start, end) {
+      this.cleared = false;
+      this.ctx.strokeStyle = '#FFFFFF';
+      this.ctx.lineJoin = 'round';
+      this.ctx.lineCap = 'round';
+      this.ctx.lineWidth = 20;
+      this.ctx.beginPath();
+      this.ctx.moveTo(start.x, start.y);
+      this.ctx.lineTo(end.x, end.y);
+      this.ctx.stroke();
+    };
+    Pen.prototype.clear = function() {
+      this.cleared = true;
+      this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    };
+
+    function uploadImage(event) {
+      var file = event.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        var img = new Image();
+        img.onload = function() {
+          _pen.clear();
+          // Draw image centered, fitting to canvas
+          var scale = Math.min(_pen.canvas.width / img.width, _pen.canvas.height / img.height);
+          var w = img.width * scale;
+          var h = img.height * scale;
+          var x = (_pen.canvas.width - w) / 2;
+          var y = (_pen.canvas.height - h) / 2;
+          _pen.ctx.fillStyle = '#000000';
+          _pen.ctx.fillRect(0, 0, _pen.canvas.width, _pen.canvas.height);
+          _pen.ctx.drawImage(img, x, y, w, h);
+          _pen.cleared = false;
+          document.getElementById('resultsCard').style.display = 'none';
+          setStatus('Image loaded. Click Predict.', 'info');
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }
+  </script>
+
+  <script>
+    // ====== GLOBALS ======
+    var _pen = null;
+    var _nn = null;
+    var _context = null;
+    var _graph = null;
+    var _inTensor = null;
+    var _outTensor = null;
+    var _buildTime = 0;
+    var _log = [];
+    var _buildLog = [];
+    var _opIdx = 0;
+
+    var SIZE_OF_SHAPE = function(shape) {
+      return shape.reduce(function(a,b) { return a*b; }, 1);
+    };
+
+    function oplog(op, shape, extra) {
+      var line = '  ' + String(++_opIdx).padStart(2) + '. ' + op + ' -> ' + JSON.stringify(shape);
+      if (extra) line += '  ' + extra;
+      _buildLog.push(line);
+      console.log(line);
+      return line;
+    }
+
+    function setStatus(msg, cls) {
+      var el = document.getElementById('status');
+      el.textContent = msg;
+      el.className = 'status ' + (cls || 'info');
+    }
+
+    function toggleLog() {
+      var pre = document.getElementById('logOutput');
+      pre.style.display = document.getElementById('logToggle').checked ? 'block' : 'none';
+    }
+
+    // ====== BUILD LeNet GRAPH (NCHW layout, matches webnn-samples) ======
+    function buildGraph(context, arrayBuffer) {
+      _opIdx = 0;
+      _buildLog = [];
+      _log = [];
+
+      var builder = new MLGraphBuilder(context);
+
+      // Input: NCHW [1,1,28,28]
+      var input = builder.input('input', {dataType: 'float32', shape: [1,1,28,28]});
+      oplog('input', [1,1,28,28]);
+
+      var byteOffset = 0;
+
+      // Conv1: 1→20, 5×5, no padding, OIHW filter
+      var c1FilterShape = [20, 1, 5, 5];
+      var c1FilterData = new Float32Array(arrayBuffer, byteOffset, SIZE_OF_SHAPE(c1FilterShape));
+      var c1Filter = builder.constant({dataType:'float32', dimensions:c1FilterShape, shape:c1FilterShape}, c1FilterData);
+      byteOffset += SIZE_OF_SHAPE(c1FilterShape) * 4;
+
+      var c1BiasShape = [20];
+      var c1Bias = builder.constant({dataType:'float32', dimensions:c1BiasShape, shape:c1BiasShape},
+          new Float32Array(arrayBuffer, byteOffset, SIZE_OF_SHAPE(c1BiasShape)));
+      byteOffset += SIZE_OF_SHAPE(c1BiasShape) * 4;
+
+      var c1 = builder.conv2d(input, c1Filter, {bias: c1Bias});
+      oplog('conv2d_1 (1→20, 5×5)', [1,20,24,24]);
+      var p1 = builder.maxPool2d(c1, {windowDimensions:[2,2], strides:[2,2]});
+      oplog('maxPool2d_1 (2×2/2)', [1,20,12,12]);
+
+      // Conv2: 20→50, 5×5, no padding
+      var c2FilterShape = [50, 20, 5, 5];
+      var c2FilterData = new Float32Array(arrayBuffer, byteOffset, SIZE_OF_SHAPE(c2FilterShape));
+      var c2Filter = builder.constant({dataType:'float32', dimensions:c2FilterShape, shape:c2FilterShape}, c2FilterData);
+      byteOffset += SIZE_OF_SHAPE(c2FilterShape) * 4;
+
+      var c2BiasShape = [50];
+      var c2Bias = builder.constant({dataType:'float32', dimensions:c2BiasShape, shape:c2BiasShape},
+          new Float32Array(arrayBuffer, byteOffset, SIZE_OF_SHAPE(c2BiasShape)));
+      byteOffset += SIZE_OF_SHAPE(c2BiasShape) * 4;
+
+      var c2 = builder.conv2d(p1, c2Filter, {bias: c2Bias});
+      oplog('conv2d_2 (20→50, 5×5)', [1,50,8,8]);
+      var p2 = builder.maxPool2d(c2, {windowDimensions:[2,2], strides:[2,2]});
+      oplog('maxPool2d_2 (2×2/2)', [1,50,4,4]);
+
+      // Flatten: [1,50,4,4] → [1,800]
+      var flat = builder.reshape(p2, [1, 800]);
+      oplog('reshape flatten', [1,800]);
+
+      // Skip reshape attr (2 int64 = 16 bytes)
+      byteOffset += 16;
+
+      // FC1: 800→500 with ReLU
+      var fc1wShape = [500, 800];
+      var fc1wData = new Float32Array(arrayBuffer, byteOffset, SIZE_OF_SHAPE(fc1wShape));
+      var fc1w = builder.constant({dataType:'float32', dimensions:fc1wShape, shape:fc1wShape}, fc1wData);
+      byteOffset += SIZE_OF_SHAPE(fc1wShape) * 4;
+
+      var fc1wT = builder.transpose(fc1w);
+      var fc1 = builder.gemm(flat, fc1wT);
+      oplog('gemm_1 (800→500)', [1,500]);
+
+      var fc1bShape = [1, 500];
+      var fc1b = builder.constant({dataType:'float32', dimensions:fc1bShape, shape:fc1bShape},
+          new Float32Array(arrayBuffer, byteOffset, SIZE_OF_SHAPE(fc1bShape)));
+      byteOffset += SIZE_OF_SHAPE(fc1bShape) * 4;
+
+      var fc1a = builder.add(fc1, fc1b);
+      oplog('add bias', [1,500]);
+      var relu = builder.relu(fc1a);
+      oplog('relu', [1,500]);
+      var fc1out = builder.reshape(relu, [1, 500]);
+      oplog('reshape', [1,500]);
+
+      // FC2: 500→10
+      var fc2wShape = [10, 500];
+      var fc2wData = new Float32Array(arrayBuffer, byteOffset, SIZE_OF_SHAPE(fc2wShape));
+      var fc2w = builder.constant({dataType:'float32', dimensions:fc2wShape, shape:fc2wShape}, fc2wData);
+      byteOffset += SIZE_OF_SHAPE(fc2wShape) * 4;
+
+      var fc2wT = builder.transpose(fc2w);
+      var fc2 = builder.gemm(fc1out, fc2wT);
+      oplog('gemm_2 (500→10)', [1,10]);
+
+      var fc2bShape = [1, 10];
+      var fc2b = builder.constant({dataType:'float32', dimensions:fc2bShape, shape:fc2bShape},
+          new Float32Array(arrayBuffer, byteOffset, SIZE_OF_SHAPE(fc2bShape)));
+
+      var fc2a = builder.add(fc2, fc2b);
+      oplog('add bias', [1,10]);
+
+      // Softmax
+      var output = builder.softmax(fc2a, 1);
+      oplog('softmax', [1,10]);
+
+      _log = _buildLog;
+      return builder.build({'output': output});
+    }
+
+    // ====== LOAD MODEL ======
+    async function loadModel() {
+      var loadBtn = document.getElementById('loadBtn');
+      var deviceType = document.getElementById('deviceSelect').value;
+
+      try {
+        loadBtn.disabled = true;
+        setStatus('Downloading LeNet weights (1.6 MB)...', 'info');
+
+        var resp = await fetch('lenet.bin');
+        if (!resp.ok) throw new Error('Failed to fetch lenet.bin');
+        var arrayBuffer = await resp.arrayBuffer();
+
+        if (arrayBuffer.byteLength !== 1724336) {
+          throw new Error('Incorrect weight file size: ' + arrayBuffer.byteLength);
+        }
+
+        setStatus('Creating WebNN context (' + deviceType.toUpperCase() + ')...', 'info');
+        _context = await navigator.ml.createContext({deviceType: deviceType});
+
+        setStatus('Building LeNet graph (2 conv + 2 FC)...', 'info');
+        var buildStart = performance.now();
+        _graph = await buildGraph(_context, arrayBuffer);
+        _buildTime = (performance.now() - buildStart).toFixed(0);
+
+        _inTensor = await _context.createTensor({
+          dataType: 'float32', shape: [1, 1, 28, 28], writable: true
+        });
+        _outTensor = await _context.createTensor({
+          dataType: 'float32', shape: [1, 10], readable: true
+        });
+
+        document.getElementById('logOutput').textContent = _buildLog.join('\n');
+        document.getElementById('predictBtn').disabled = false;
+        setStatus('Model loaded. Build time: ' + _buildTime + 'ms. ' +
+          _buildLog.length + ' ops logged. Draw a digit and click Predict.', 'success');
+
+      } catch (err) {
+        setStatus('Error: ' + err.message, 'error');
+        console.error(err);
+      } finally {
+        loadBtn.disabled = false;
+      }
+    }
+
+    // ====== GET INPUT FROM CANVAS ======
+    function getInputFromCanvas() {
+      var srcCanvas = document.getElementById('visualCanvas');
+      // Downscale to 28x28
+      var digCanvas = document.createElement('canvas');
+      digCanvas.width = 28;
+      digCanvas.height = 28;
+      var dctx = digCanvas.getContext('2d');
+      dctx.drawImage(srcCanvas, 0, 0, 28, 28);
+
+      var imageData = dctx.getImageData(0, 0, 28, 28);
+      var data = imageData.data;
+      var input = new Float32Array(28 * 28);
+
+      // Extract red channel (grayscale), raw pixel values [0,255]
+      for (var i = 0; i < input.length; i++) {
+        input[i] = data[i * 4];
+      }
+
+      return input;
+    }
+
+    // ====== PREDICT ======
+    async function predict() {
+      var predictBtn = document.getElementById('predictBtn');
+
+      try {
+        if (_pen.cleared) {
+          setStatus('Please draw a digit first.', 'info');
+          return;
+        }
+        if (!_graph) {
+          setStatus('Please load the model first.', 'info');
+          return;
+        }
+
+        predictBtn.disabled = true;
+        setStatus('Running inference...', 'info');
+
+        var input = getInputFromCanvas();
+
+        _context.writeTensor(_inTensor, input);
+
+        var inferStart = performance.now();
+        _context.dispatch(_graph, {'input': _inTensor}, {'output': _outTensor});
+        var results = new Float32Array(await _context.readTensor(_outTensor));
+        var inferTime = (performance.now() - inferStart).toFixed(0);
+
+        // Log results
+        var runLog = [];
+        runLog.push('--- INFERENCE ---');
+        runLog.push('  device: ' + document.getElementById('deviceSelect').value.toUpperCase());
+        runLog.push('  writeTensor: input [1,1,28,28] (' + input.length + ' values)');
+        runLog.push('  input min/max: ' + Math.min.apply(null, input).toFixed(4) + ' / ' + Math.max.apply(null, input).toFixed(4));
+        runLog.push('  input nonzeros: ' + input.filter(function(v){return v>0;}).length + '/' + input.length);
+        runLog.push('  dispatch time: ' + inferTime + 'ms');
+        runLog.push('  readTensor: output [1,10]');
+        for (var i = 0; i < 10; i++) {
+          runLog.push('    digit ' + i + ': ' + (results[i]*100).toFixed(2) + '%');
+        }
+        var fullLog = _buildLog.concat(runLog);
+        document.getElementById('logOutput').textContent = fullLog.join('\n');
+        console.log(runLog.join('\n'));
+
+        // Top-3 predictions
+        var indexed = [];
+        for (var i = 0; i < 10; i++) {
+          indexed.push({digit: i, score: results[i]});
+        }
+        indexed.sort(function(a, b) { return b.score - a.score; });
+
+        var html = '';
+        for (var i = 0; i < 3; i++) {
+          var pct = indexed[i].score * 100;
+          html += '<div class="result-row">';
+          html += '<span class="result-rank">#' + (i+1) + '</span>';
+          html += '<span class="result-digit">' + indexed[i].digit + '</span>';
+          html += '<div class="result-bar-wrap"><div class="result-bar" style="width:' + pct.toFixed(1) + '%"></div></div>';
+          html += '<span class="result-pct">' + pct.toFixed(1) + '%</span>';
+          html += '</div>';
+        }
+        document.getElementById('predictions').innerHTML = html;
+        document.getElementById('resultsCard').style.display = 'block';
+        document.getElementById('timingInfo').textContent = 'Build: ' + _buildTime + 'ms | Inference: ' + inferTime + 'ms';
+
+        setStatus('Predicted: ' + indexed[0].digit + ' (' + (indexed[0].score*100).toFixed(1) + '%)', 'success');
+
+      } catch (err) {
+        setStatus('Error: ' + err.message, 'error');
+        console.error(err);
+      } finally {
+        predictBtn.disabled = false;
+      }
+    }
+
+    function clearCanvas() {
+      _pen.clear();
+      document.getElementById('resultsCard').style.display = 'none';
+      setStatus('Canvas cleared. Draw a digit and click Predict.', 'info');
+    }
+
+    // ====== INIT ======
+    window.addEventListener('load', function() {
+      _pen = new Pen(document.getElementById('visualCanvas'));
+    });
+  </script>
+</body>
+</html>
