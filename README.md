@@ -49,6 +49,7 @@ CPU / GPU / NPU device selector where supported.
 | YOLOv8s | YOLOv8s object detection | [`yolov8s-webnn/`](yolov8s-webnn/) |
 | YOLOv8s Detection | YOLOv8s detection demo | [`yolov8s_detection/`](yolov8s_detection/) |
 | Virtual Try-On | Realtime virtual makeup / lip try-on | [`virtual_tryon/`](virtual_tryon/) |
+| Erase People | YOLOv8n-seg instance segmentation — keep center person, erase others | [`erase_people/`](erase_people/) |
 
 ### TensorFlow.js / TFLite
 
