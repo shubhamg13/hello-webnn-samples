@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Graph Explorer · YOLOv8n-Face Postprocessing</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; color: #1a1a1a; padding: 0; display:flex; height:100vh; }
+    .sidebar { width: 360px; min-width:360px; overflow-y:auto; padding:1rem; border-right:1px solid #ddd; display:flex; flex-direction:column; gap:0.75rem; }
+    .main { flex:1; overflow:auto; padding:1rem; display:flex; flex-direction:column; gap:0.75rem; }
+    h1 { font-size:1.2rem; } h3 { font-size:1rem; margin-bottom:0.25rem; }
+    .subtitle { color:#666; font-size:0.8rem; }
+    .card { background:#fff; padding:0.75rem 1rem; border:1px solid #eee; }
+    .controls { display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap; }
+    label { font-weight:600; font-size:0.8rem; }
+    select, button { padding:0.25rem 0.5rem; border:1px solid #ddd; font-size:0.8rem; }
+    button { background:rgba(0,47,167,1); color:#fff; border:none; cursor:pointer; }
+    button:hover { background:rgba(0,47,167,0.85); }
+    button:disabled { background:#ccc; cursor:not-allowed; }
+    button.warn { background:#e94560; }
+    .status { padding:0.5rem; font-size:0.8rem; border-radius:4px; }
+    .status.info { background:#e3f2fd; border-left:3px solid #2196F3; }
+    .status.success { background:#e9f8f0; border-left:3px solid #068906; }
+    .status.error { background:#ffebee; border-left:3px solid #f44336; }
+    pre { margin:0.25rem 0; background:#f5f5f5; padding:0.4rem 0.8rem; overflow-x:auto; font-size:0.7rem; max-height:150px; white-space:pre-wrap; word-break:break-all; }
+    #graphCard { overflow:auto; } #graphCard svg { display:block; }
+    .graph-node { cursor:pointer; } .graph-node rect { stroke-width:2; }
+    .graph-node text { font-family:system-ui,sans-serif; pointer-events:none; }
+    .graph-edge { fill:none; stroke:#999; stroke-width:1.5; }
+    .graph-edge-active { stroke:#0052cc; stroke-width:2; }
+    .node-info { font-size:0.8rem; color:#555; }
+    .diff-same { color:#068906; } .diff-diff { color:#e94560; font-weight:bold; }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <h1>YOLOv8n-Face PP</h1>
+    <p class="subtitle">Postprocessing pipeline · compare Graph vs JS</p>
+
+    <div class="card">
+      <div class="controls">
+        <label>Device:</label>
+        <select id="deviceSelect">
+          <option value="cpu">CPU</option>
+          <option value="gpu">GPU</option>
+          <option value="npu">NPU</option>
+        </select>
+        <button id="genBtn" onclick="generateAndRun()">Generate &amp; Run</button>
+      </div>
+      <div class="controls" style="margin-top:0.4rem;">
+        <button id="runBtn" onclick="runSelected()" disabled>Run Selected</button>
+        <button id="runAllBtn" onclick="runAll()" disabled>Run All</button>
+        <button id="compareBtn" onclick="compareWithJS()" class="warn" disabled>Compare Graph vs JS</button>
+      </div>
+      <div id="inputPreview" style="font-size:0.7rem;color:#888;margin-top:0.3rem;">No data — click "Generate &amp; Run"</div>
+    </div>
+
+    <div class="card" id="compareCard" style="display:none;">
+      <h3>Graph vs JS Comparison</h3>
+      <div id="compareResult" style="font-size:0.7rem;"></div>
+    </div>
+
+    <div class="card" id="nodeCard">
+      <h3>Selected Node</h3>
+      <div id="nodeInfo" class="node-info">Click a node in the graph</div>
+    </div>
+
+    <div id="status" class="status info">Ready. Click "Generate & Run" to begin.</div>
+
+    <div class="card" id="resultsCard" style="display:none;flex:1;overflow:auto;">
+      <h3>Results</h3>
+      <div id="results"></div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="card" id="graphCard" style="flex:1;">
+      <h3>Postprocessing Graph (click nodes)</h3>
+      <div id="graphContainer"></div>
+    </div>
+  </div>
+
+  <script>
+// ============================================================================
+// Globals
+// ============================================================================
+let mlContext = null;
+let rawOutputs = null;  // {output0, cat_17, cat_18} Float32Arrays
+let _jsBoxData = null, _jsScoreData = null, _jsKptData = null;
+let _graphBoxData = null, _graphScoreData = null;
+
+// ============================================================================
+// Node definitions
+// ============================================================================
+function N(id, type, inputs, params, shape, label, detail) {
+  return { id, type, inputs, params: params || {}, shape, label, detail: detail || '' };
+}
+
+const NODES = [
+  N('output0', 'input', [], {}, [1,80,80,80], 'output0', 'P3 stride 8'),
+  N('cat_17', 'input', [], {}, [1,80,40,40], 'cat_17', 'P4 stride 16'),
+  N('cat_18', 'input', [], {}, [1,80,20,20], 'cat_18', 'P5 stride 32'),
+  N('flat0', 'reshape', ['output0'], { shape: [1,80,6400] }, [1,80,6400], 'Reshape', '80×80→6400'),
+  N('flat1', 'reshape', ['cat_17'], { shape: [1,80,1600] }, [1,80,1600], 'Reshape', '40×40→1600'),
+  N('flat2', 'reshape', ['cat_18'], { shape: [1,80,400] }, [1,80,400], 'Reshape', '20×20→400'),
+  N('combined', 'concat', ['flat0','flat1','flat2'], { axis: 2 }, [1,80,8400], 'Concat', '6400+1600+400'),
+  N('box_reg', 'slice', ['combined'], { starts: [0,0,0], sizes: [1,64,8400] }, [1,64,8400], 'Slice ch 0-63', 'bbox'),
+  N('cls_raw', 'slice', ['combined'], { starts: [0,64,0], sizes: [1,1,8400] }, [1,1,8400], 'Slice ch 64', 'class'),
+  N('kpt_raw', 'slice', ['combined'], { starts: [0,65,0], sizes: [1,15,8400] }, [1,15,8400], 'Slice ch 65-79', 'keypoints'),
+  // DFL left
+  N('side0_ch', 'slice', ['box_reg'], { starts: [0,0,0], sizes: [1,16,8400] }, [1,16,8400], 'Slice L', 'ch 0-15'),
+  N('side0_soft', 'softmax', ['side0_ch'], { axis: 1 }, [1,16,8400], 'Softmax L', ''),
+  N('side0_w', 'mul', ['side0_soft','dflW'], {}, [1,16,8400], '×w L', ''),
+  N('side0_sum', 'reduceSum', ['side0_w'], { axes: [1] }, [1,8400], 'Sum L', 'left dist'),
+  // DFL top
+  N('side1_ch', 'slice', ['box_reg'], { starts: [0,16,0], sizes: [1,16,8400] }, [1,16,8400], 'Slice T', 'ch 16-31'),
+  N('side1_soft', 'softmax', ['side1_ch'], { axis: 1 }, [1,16,8400], 'Softmax T', ''),
+  N('side1_w', 'mul', ['side1_soft','dflW'], {}, [1,16,8400], '×w T', ''),
+  N('side1_sum', 'reduceSum', ['side1_w'], { axes: [1] }, [1,8400], 'Sum T', 'top dist'),
+  // DFL right
+  N('side2_ch', 'slice', ['box_reg'], { starts: [0,32,0], sizes: [1,16,8400] }, [1,16,8400], 'Slice R', 'ch 32-47'),
+  N('side2_soft', 'softmax', ['side2_ch'], { axis: 1 }, [1,16,8400], 'Softmax R', ''),
+  N('side2_w', 'mul', ['side2_soft','dflW'], {}, [1,16,8400], '×w R', ''),
+  N('side2_sum', 'reduceSum', ['side2_w'], { axes: [1] }, [1,8400], 'Sum R', 'right dist'),
+  // DFL bottom
+  N('side3_ch', 'slice', ['box_reg'], { starts: [0,48,0], sizes: [1,16,8400] }, [1,16,8400], 'Slice B', 'ch 48-63'),
+  N('side3_soft', 'softmax', ['side3_ch'], { axis: 1 }, [1,16,8400], 'Softmax B', ''),
+  N('side3_w', 'mul', ['side3_soft','dflW'], {}, [1,16,8400], '×w B', ''),
+  N('side3_sum', 'reduceSum', ['side3_w'], { axes: [1] }, [1,8400], 'Sum B', 'bottom dist'),
+  N('dflW', 'constant', [], { shape: [1,16,8400] }, [1,16,8400], 'DFL w', 'ch c = c'),
+  N('dist', 'concat', ['side0_sum','side1_sum','side2_sum','side3_sum'], { axis: 1 }, [1,4,8400], 'Concat dist', 'L,T,R,B'),
+  // dist2bbox
+  N('anchors', 'constant', [], { shape: [1,2,8400] }, [1,2,8400], 'Anchors', 'gx+0.5,gy+0.5'),
+  N('strides', 'constant', [], { shape: [1,1,8400] }, [1,1,8400], 'Strides', '8/16/32'),
+  N('ax', 'slice', ['anchors'], { starts: [0,0,0], sizes: [1,1,8400] }, [1,1,8400], 'ax', ''),
+  N('ay', 'slice', ['anchors'], { starts: [0,1,0], sizes: [1,1,8400] }, [1,1,8400], 'ay', ''),
+  N('left', 'slice', ['dist'], { starts: [0,0,0], sizes: [1,1,8400] }, [1,1,8400], 'left', ''),
+  N('top', 'slice', ['dist'], { starts: [0,1,0], sizes: [1,1,8400] }, [1,1,8400], 'top', ''),
+  N('right', 'slice', ['dist'], { starts: [0,2,0], sizes: [1,1,8400] }, [1,1,8400], 'right', ''),
+  N('bottom', 'slice', ['dist'], { starts: [0,3,0], sizes: [1,1,8400] }, [1,1,8400], 'bottom', ''),
+  N('ax_left', 'sub', ['ax','left'], {}, [1,1,8400], 'ax−left', ''),
+  N('x1', 'mul', ['ax_left','strides'], {}, [1,1,8400], 'x1', '(ax−left)×s'),
+  N('ay_top', 'sub', ['ay','top'], {}, [1,1,8400], 'ay−top', ''),
+  N('y1', 'mul', ['ay_top','strides'], {}, [1,1,8400], 'y1', '(ay−top)×s'),
+  N('ax_right', 'add', ['ax','right'], {}, [1,1,8400], 'ax+right', ''),
+  N('x2', 'mul', ['ax_right','strides'], {}, [1,1,8400], 'x2', '(ax+right)×s'),
+  N('ay_bottom', 'add', ['ay','bottom'], {}, [1,1,8400], 'ay+bottom', ''),
+  N('y2', 'mul', ['ay_bottom','strides'], {}, [1,1,8400], 'y2', '(ay+bottom)×s'),
+  N('boxes', 'concat', ['x1','y1','x2','y2'], { axis: 1 }, [1,4,8400], 'Boxes xyxy', ''),
+  N('scores', 'sigmoid', ['cls_raw'], {}, [1,1,8400], 'Scores', 'sigmoid'),
+  // kpt0 only for clarity
+  N('kpt0_xy', 'slice', ['kpt_raw'], { starts: [0,0,0], sizes: [1,2,8400] }, [1,2,8400], 'kpt0 xy', 'ch 0-1'),
+  N('kpt0_vis', 'slice', ['kpt_raw'], { starts: [0,2,0], sizes: [1,1,8400] }, [1,1,8400], 'kpt0 vis', 'ch 2'),
+  N('kpt0_s2', 'mul', ['kpt0_xy','const2'], {}, [1,2,8400], '×2', ''),
+  N('anch_05', 'sub', ['anch_xy','const05'], {}, [1,2,8400], 'anc−0.5', ''),
+  N('kpt0_add', 'add', ['kpt0_s2','anch_05'], {}, [1,2,8400], '+anc', ''),
+  N('kpt0_dec', 'mul', ['kpt0_add','strides2'], {}, [1,2,8400], '×s', ''),
+  N('kpt0_vs', 'sigmoid', ['kpt0_vis'], {}, [1,1,8400], 'vis sig', ''),
+  N('kpt0_out', 'concat', ['kpt0_dec','kpt0_vs'], { axis: 1 }, [1,3,8400], 'kpt0 out', ''),
+  N('const2', 'constant', [], { shape: [1,2,8400] }, [1,2,8400], '2.0', ''),
+  N('const05','constant', [], { shape: [1,2,8400] }, [1,2,8400], '0.5', ''),
+  N('anch_xy','concat', ['ax','ay'], { axis: 1 }, [1,2,8400], '[ax,ay]', ''),
+  N('strides2','concat', ['strides','strides'], { axis: 1 }, [1,2,8400], '[s,s]', ''),
+];
+
+const NODE_MAP = {};
+for (const n of NODES) NODE_MAP[n.id] = n;
+
+function buildEdges() {
+  const edges = [];
+  for (const n of NODES) for (const inp of n.inputs) { if (NODE_MAP[inp]) edges.push({ from: inp, to: n.id }); }
+  return edges;
+}
+const GRAPH_EDGES = buildEdges();
+
+// ============================================================================
+// Layout & rendering
+// ============================================================================
+const OP_COLORS = {
+  input:{fill:'#dbeafe',stroke:'#3b82f6',text:'#1e40af'}, reshape:{fill:'#fce7f3',stroke:'#ec4899',text:'#9d174d'},
+  concat:{fill:'#fef3c7',stroke:'#f59e0b',text:'#92400e'}, slice:{fill:'#ede9fe',stroke:'#8b5cf6',text:'#5b21b6'},
+  softmax:{fill:'#d1fae5',stroke:'#10b981',text:'#065f46'}, mul:{fill:'#ffedd5',stroke:'#f97316',text:'#9a3412'},
+  reduceSum:{fill:'#ccfbf1',stroke:'#14b8a6',text:'#115e59'}, sub:{fill:'#ffe4e6',stroke:'#f43f5e',text:'#881337'},
+  add:{fill:'#dbeafe',stroke:'#3b82f6',text:'#1e40af'}, sigmoid:{fill:'#d1fae5',stroke:'#10b981',text:'#065f46'},
+  constant:{fill:'#f3f4f6',stroke:'#9ca3af',text:'#4b5563'},
+};
+const HIGHLIGHT={fill:'#fff3e0',stroke:'#ff6d00',text:'#bf360c'}, ACTIVE={fill:'#dbeafe',stroke:'#0052cc',text:'#1e40af'};
+let _nodeLayers={}, _selectedNodeId=null, _dependencyIds=new Set();
+
+function layoutGraph(nodes, edges) {
+  const layers={}, visited={};
+  function getLayer(id) {
+    if (visited[id]!==undefined) return visited[id];
+    const incoming = edges.filter(e => e.to === id);
+    if (incoming.length===0) { visited[id]=0; return 0; }
+    let max=0; for (const e of incoming) max=Math.max(max, getLayer(e.from)+1);
+    visited[id]=max; return max;
+  }
+  for (const n of nodes) getLayer(n.id);
+  _nodeLayers={...visited};
+  for (const n of nodes) { const l=visited[n.id]; if (!layers[l]) layers[l]=[]; layers[l].push(n.id); }
+  const NW=130, NH=40, GX=20, GY=6;
+  const sorted=Object.keys(layers).sort((a,b)=>a-b);
+  const positions={};
+  for (const l of sorted) { const ids=layers[l]; const x=+l*(NW+GX)+10; let y=10; for (const id of ids) { positions[id]={x,y}; y+=NH+GY; } }
+  return {positions,nodeW:NW,nodeH:NH,width:Math.max(sorted.length*(NW+GX)+20,800),height:Math.max(...sorted.map(l=>layers[l].length*(NH+GY)+10),80)};
+}
+
+function renderGraph(selectedId) {
+  const container=document.getElementById('graphContainer');
+  const {positions,nodeW,nodeH,width,height}=layoutGraph(NODES,GRAPH_EDGES);
+  const svgNS='http://www.w3.org/2000/svg';
+  let svg=container.querySelector('svg'); if(!svg){svg=document.createElementNS(svgNS,'svg');container.appendChild(svg);}
+  svg.setAttribute('width',width);svg.setAttribute('height',height);svg.setAttribute('viewBox','0 0 '+width+' '+height);svg.innerHTML='';
+  const defs=document.createElementNS(svgNS,'defs');
+  ['arrowhead','arrowhead-active'].forEach((id,i)=>{
+    const m=document.createElementNS(svgNS,'marker');m.setAttribute('id',id);m.setAttribute('markerWidth','8');m.setAttribute('markerHeight','6');
+    m.setAttribute('refX','8');m.setAttribute('refY','3');m.setAttribute('orient','auto');
+    const p=document.createElementNS(svgNS,'polygon');p.setAttribute('points','0 0, 8 3, 0 6');p.setAttribute('fill',i===0?'#999':'#ff6d00');
+    m.appendChild(p);defs.appendChild(m);
+  });svg.appendChild(defs);
+  const srcPorts={},dstPorts={};
+  for(const e of GRAPH_EDGES){if(!positions[e.from]||!positions[e.to])continue;(srcPorts[e.from]=srcPorts[e.from]||[]).push(e.to);(dstPorts[e.to]=dstPorts[e.to]||[]).push(e.from);}
+  function po(map,id,n){const arr=map[id]||[];const idx=arr.indexOf(n);return arr.length<=1?0.5:(idx+1)/(arr.length+1);}
+  for(const edge of GRAPH_EDGES){
+    const from=positions[edge.from],to=positions[edge.to];if(!from||!to)continue;
+    const active=_dependencyIds.has(edge.from)&&_dependencyIds.has(edge.to);
+    const path=document.createElementNS(svgNS,'path');
+    const y1=po(srcPorts,edge.from,edge.to),y2=po(dstPorts,edge.to,edge.from);
+    const x1=from.x+nodeW,y1_=from.y+y1*nodeH,x2=to.x,y2_=to.y+y2*nodeH,midX=(x1+x2)/2;
+    path.setAttribute('d','M'+x1+','+y1_+' C'+midX+','+y1_+' '+midX+','+y2_+' '+x2+','+y2_);
+    path.setAttribute('class',active?'graph-edge graph-edge-active':'graph-edge');
+    path.setAttribute('opacity',active?1:0.3);path.setAttribute('marker-end','url('+(active?'#arrowhead-active':'#arrowhead')+')');svg.appendChild(path);
+  }
+  for(const node of NODES){
+    const pos=positions[node.id];if(!pos)continue;
+    const isSel=node.id===selectedId,isDep=_dependencyIds.has(node.id);
+    const bc=OP_COLORS[node.type]||OP_COLORS.conv2d;
+    let fill,stroke,text;if(isSel){fill=HIGHLIGHT.fill;stroke=HIGHLIGHT.stroke;text=HIGHLIGHT.text;}else if(isDep){fill=ACTIVE.fill;stroke=ACTIVE.stroke;text=ACTIVE.text;}else{fill=bc.fill;stroke=bc.stroke;text=bc.text;}
+    const g=document.createElementNS(svgNS,'g');g.setAttribute('class','graph-node');g.setAttribute('data-id',node.id);
+    g.setAttribute('opacity',isDep||isSel?1:0.3);g.style.cursor='pointer';g.addEventListener('click',()=>selectNode(node.id));
+    const r=document.createElementNS(svgNS,'rect');r.setAttribute('x',pos.x);r.setAttribute('y',pos.y);r.setAttribute('width',nodeW);r.setAttribute('height',nodeH);
+    r.setAttribute('rx','5');r.setAttribute('ry','5');r.setAttribute('fill',fill);r.setAttribute('stroke',stroke);g.appendChild(r);
+    const tl=document.createElementNS(svgNS,'text');tl.setAttribute('x',pos.x+nodeW/2);tl.setAttribute('y',pos.y+nodeH/2-11);
+    tl.setAttribute('text-anchor','middle');tl.setAttribute('fill',text);tl.setAttribute('font-size','7');tl.setAttribute('opacity','0.55');tl.textContent=node.id;g.appendChild(tl);
+    const lb=document.createElementNS(svgNS,'text');lb.setAttribute('x',pos.x+nodeW/2);lb.setAttribute('y',pos.y+nodeH/2+2);
+    lb.setAttribute('text-anchor','middle');lb.setAttribute('fill',text);lb.setAttribute('font-size','9');lb.setAttribute('font-weight','600');lb.textContent=node.label;g.appendChild(lb);
+    if(node.detail){const dt=document.createElementNS(svgNS,'text');dt.setAttribute('x',pos.x+nodeW/2);dt.setAttribute('y',pos.y+nodeH/2+15);dt.setAttribute('text-anchor','middle');dt.setAttribute('fill',text);dt.setAttribute('font-size','7');dt.setAttribute('opacity','0.7');dt.textContent=node.detail;g.appendChild(dt);}
+    svg.appendChild(g);
+  }
+}
+
+function traceDeps(id){const d=new Set();function w(i){if(d.has(i))return;d.add(i);const n=NODE_MAP[i];if(!n)return;for(const p of n.inputs)w(p);}w(id);return d;}
+function topoOrder(deps){const inDeg={},adj={};for(const id of deps){const n=NODE_MAP[id];if(!n)continue;adj[id]=adj[id]||[];if(inDeg[id]===undefined)inDeg[id]=0;for(const i of n.inputs){if(deps.has(i)){adj[i]=adj[i]||[];adj[i].push(id);inDeg[id]=(inDeg[id]||0)+1;}}}const q=[];for(const id of deps)if((inDeg[id]||0)===0)q.push(id);const o=[];while(q.length){const id=q.shift();o.push(id);for(const nx of(adj[id]||[])){inDeg[nx]--;if(inDeg[nx]===0)q.push(nx);}}return o;}
+
+// ============================================================================
+// Subgraph builder
+// ============================================================================
+function buildConstant(id, builder) {
+  if (id === 'dflW') { const d=new Float32Array(16*8400);for(let c=0;c<16;c++)d.fill(c,c*8400,(c+1)*8400);return builder.constant({dataType:'float32',shape:[1,16,8400]},d); }
+  if (id === 'anchors') { const d=new Float32Array(2*8400);const f=[{h:80,w:80},{h:40,w:40},{h:20,w:20}];let o=0;for(let s=0;s<3;s++)for(let y=0;y<f[s].h;y++)for(let x=0;x<f[s].w;x++){d[o*2]=x+0.5;d[o*2+1]=y+0.5;o++;}return builder.constant({dataType:'float32',shape:[1,2,8400]},d); }
+  if (id === 'strides') { const d=new Float32Array(8400);const f=[{h:80,w:80},{h:40,w:40},{h:20,w:20}];const sv=[8,16,32];let o=0;for(let s=0;s<3;s++)for(let y=0;y<f[s].h;y++)for(let x=0;x<f[s].w;x++)d[o++]=sv[s];return builder.constant({dataType:'float32',shape:[1,1,8400]},d); }
+  if (id === 'const2') { const d=new Float32Array(2*8400);d.fill(2.0);return builder.constant({dataType:'float32',shape:[1,2,8400]},d); }
+  if (id === 'const05') { const d=new Float32Array(2*8400);d.fill(0.5);return builder.constant({dataType:'float32',shape:[1,2,8400]},d); }
+  return null;
+}
+
+async function buildPostprocessSubgraph(targetId) {
+  if (!mlContext) throw new Error('No context. Click "Generate & Run" first.');
+  if (!rawOutputs) throw new Error('No input data. Click "Generate & Run" first.');
+  const builder = new MLGraphBuilder(mlContext);
+  const deps = traceDeps(targetId);
+  const order = topoOrder(deps);
+  const tensors = {};
+  for (const id of order) {
+    const node = NODE_MAP[id]; if (!node) continue;
+    if (node.type === 'input') { tensors[id] = builder.input(id, { dataType: 'float32', shape: node.shape }); continue; }
+    if (node.type === 'constant') { tensors[id] = buildConstant(id, builder); continue; }
+    const inTensors = node.inputs.map(i => tensors[i]).filter(Boolean);
+    switch (node.type) {
+      case 'reshape': tensors[id] = builder.reshape(inTensors[0], node.params.shape || node.shape); break;
+      case 'concat': tensors[id] = builder.concat(inTensors, node.params.axis || 0); break;
+      case 'slice': tensors[id] = builder.slice(inTensors[0], node.params.starts, node.params.sizes); break;
+      case 'softmax': tensors[id] = builder.softmax(inTensors[0], node.params.axis || 1); break;
+      case 'mul': tensors[id] = builder.mul(inTensors[0], inTensors[1]); break;
+      case 'reduceSum': tensors[id] = builder.reduceSum(inTensors[0], { axes: node.params.axes, keepDimensions: false }); break;
+      case 'sub': tensors[id] = builder.sub(inTensors[0], inTensors[1]); break;
+      case 'add': tensors[id] = builder.add(inTensors[0], inTensors[1]); break;
+      case 'sigmoid': tensors[id] = builder.sigmoid(inTensors[0]); break;
+    }
+  }
+  const output = tensors[targetId];
+  if (!output) throw new Error('Failed to build: ' + targetId);
+  const namedInputs = {};
+  for (const id of ['output0','cat_17','cat_18']) { if (tensors[id] && deps.has(id)) namedInputs[id] = tensors[id]; }
+  const namedOutputs = { output };
+  const outputShapes = {};
+  for (const [name, op] of Object.entries(namedOutputs)) { try { outputShapes[name] = Array.from(op.shape); } catch(e) { outputShapes[name] = null; } }
+  const graph = await builder.build(namedOutputs);
+  const inputTensors = {};
+  for (const name of Object.keys(namedInputs)) {
+    const shape = { output0:[1,80,80,80], cat_17:[1,80,40,40], cat_18:[1,80,20,20] }[name];
+    const t = await mlContext.createTensor({ dataType: 'float32', shape, writable: true });
+    mlContext.writeTensor(t, rawOutputs[name]);
+    inputTensors[name] = t;
+  }
+  const outShape = outputShapes.output || NODE_MAP[targetId].shape;
+  const outputTensor = await mlContext.createTensor({ dataType: 'float32', shape: outShape, readable: true });
+  const t0 = performance.now();
+  mlContext.dispatch(graph, inputTensors, { output: outputTensor });
+  const inferTime = performance.now() - t0;
+  const buf = await mlContext.readTensor(outputTensor);
+  return { result: new Float32Array(buf), shape: outShape, inferTime };
+}
+
+// ============================================================================
+// Generate + run both graph and JS postprocessing
+// ============================================================================
+async function generateAndRun() {
+  const btn = document.getElementById('genBtn');
+  const statusEl = document.getElementById('status');
+  const deviceType = document.getElementById('deviceSelect').value;
+  try {
+    btn.disabled = true;
+    statusEl.className = 'status info';
+    statusEl.textContent = 'Generating random input + creating context...';
+    if (!navigator.ml) throw new Error('WebNN not supported');
+    mlContext = await navigator.ml.createContext({ deviceType });
+
+    // Random data for 3 raw model outputs — but with structured class logits to get detections
+    const shapes = { output0: [1,80,80,80], cat_17: [1,80,40,40], cat_18: [1,80,20,20] };
+    rawOutputs = {};
+    for (const [name, shape] of Object.entries(shapes)) {
+      const size = shape.reduce((a,b)=>a*b,1);
+      const data = new Float32Array(size);
+      for (let i = 0; i < size; i++) data[i] = (Math.random() * 2 - 1) * 0.3;
+      // Set some class logits (channel 64) to positive values
+      const plane = shape[2] * shape[3];
+      for (let a = 0; a < Math.min(30, plane); a++) data[64 * plane + a] = 2.0 + Math.random();
+      rawOutputs[name] = data;
+    }
+
+    // ---- JS postprocessing ----
+    statusEl.textContent = 'Running JS postprocessing...';
+    const jsT0 = performance.now();
+    const jsResult = jsPostprocessFull();
+    _jsBoxData = jsResult.boxData;
+    _jsScoreData = jsResult.scoreData;
+    _jsKptData = jsResult.kptData;
+    const jsTime = (performance.now() - jsT0).toFixed(1);
+
+    // ---- Graph postprocessing (build to boxes + scores) ----
+    statusEl.textContent = 'Building graph postprocessing...';
+    const boxR = await buildPostprocessSubgraph('boxes');
+    _graphBoxData = boxR.result;
+    const scoreR = await buildPostprocessSubgraph('scores');
+    _graphScoreData = scoreR.result;
+
+    statusEl.className = 'status success';
+    statusEl.textContent = 'Ready! JS: ' + jsTime + 'ms, ' + jsResult.numDetections + ' detections. Graph boxes + scores built.';
+
+    document.getElementById('runBtn').disabled = false;
+    document.getElementById('runAllBtn').disabled = false;
+    document.getElementById('compareBtn').disabled = false;
+    document.getElementById('inputPreview').innerHTML =
+      'Random data: 3 scales. JS found ' + jsResult.numDetections + ' faces. Click nodes or Compare.';
+
+    selectNode('flat0');
+    compareWithJS();
+  } catch (err) {
+    statusEl.className = 'status error';
+    statusEl.textContent = 'Error: ' + err.message;
+    console.error(err);
+  } finally { btn.disabled = false; }
+}
+
+// ============================================================================
+// JS postprocessing — full pipeline
+// ============================================================================
+function jsPostprocessFull() {
+  const NA = 8400;
+  const combined = new Float32Array(80 * NA);
+  const feats = [{h:80,w:80},{h:40,w:40},{h:20,w:20}];
+  let dst = 0;
+  for (let s = 0; s < 3; s++) {
+    const data = rawOutputs[['output0','cat_17','cat_18'][s]];
+    const {h,w} = feats[s]; const plane = h * w;
+    for (let c = 0; c < 80; c++)
+      for (let gy = 0; gy < h; gy++)
+        for (let gx = 0; gx < w; gx++)
+          combined[dst++] = data[c * plane + gy * w + gx];
+  }
+
+  const anchors = new Float32Array(NA*2), strideArr = new Float32Array(NA);
+  let ao = 0;
+  for (let s=0;s<3;s++){const {h,w}=feats[s];const sv=[8,16,32][s];for(let y=0;y<h;y++)for(let x=0;x<w;x++){anchors[ao*2]=x+0.5;anchors[ao*2+1]=y+0.5;strideArr[ao]=sv;ao++;}}
+
+  const boxData=new Float32Array(4*NA), scoreData=new Float32Array(NA), kptData=new Float32Array(15*NA);
+
+  function dfl(a, side) {
+    let maxV=-Infinity;
+    for(let d=0;d<16;d++){const v=combined[(side*16+d)*NA+a];if(v>maxV)maxV=v;}
+    let sum=0;const exp=new Array(16);
+    for(let d=0;d<16;d++){exp[d]=Math.exp(combined[(side*16+d)*NA+a]-maxV);sum+=exp[d];}
+    let dist=0;for(let d=0;d<16;d++)dist+=(exp[d]/sum)*d;
+    return dist;
+  }
+  function sig(x){return 1/(1+Math.exp(-Math.max(-80,Math.min(80,x))));}
+
+  for (let a = 0; a < NA; a++) {
+    const ax=anchors[a*2],ay=anchors[a*2+1],s=strideArr[a];
+    const l=dfl(a,0),t=dfl(a,1),r=dfl(a,2),b=dfl(a,3);
+    boxData[a]=(ax-l)*s; boxData[NA+a]=(ay-t)*s; boxData[2*NA+a]=(ax+r)*s; boxData[3*NA+a]=(ay+b)*s;
+    scoreData[a]=sig(combined[64*NA+a]);
+    for(let k=0;k<5;k++){
+      kptData[(k*3)*NA+a]=((combined[(65+k*3)*NA+a]*2)+(ax-0.5))*s;
+      kptData[(k*3+1)*NA+a]=((combined[(65+k*3+1)*NA+a]*2)+(ay-0.5))*s;
+      kptData[(k*3+2)*NA+a]=sig(combined[(65+k*3+2)*NA+a]);
+    }
+  }
+
+  const cand=[];for(let a=0;a<NA;a++){if(scoreData[a]>.25){const x1=boxData[a],y1=boxData[NA+a],x2=boxData[2*NA+a],y2=boxData[3*NA+a];if(x2>x1&&y2>y1)cand.push({a,s:scoreData[a],b:[x1,y1,x2,y2]});}}
+  cand.sort((a,b)=>b.s-a.s);
+  const keep=[],supp=new Uint8Array(cand.length);
+  for(let i=0;i<cand.length;i++){if(supp[i])continue;keep.push(cand[i]);for(let j=i+1;j<cand.length;j++){if(supp[j])continue;const bi=cand[i].b,bj=cand[j].b;const ix=Math.max(bi[0],bj[0]),iy=Math.max(bi[1],bj[1]),ix2=Math.min(bi[2],bj[2]),iy2=Math.min(bi[3],bj[3]);const iw=ix2-ix,ih=iy2-iy;if(iw<=0||ih<=0)continue;const inter=iw*ih;if(inter/((bi[2]-bi[0])*(bi[3]-bi[1])+(bj[2]-bj[0])*(bj[3]-bj[1])-inter+1e-16)>=.45)supp[j]=1;}}
+  const topK=keep.slice(0,300);
+  return {boxData,scoreData,kptData,numDetections:topK.length,detections:topK.map(k=>({score:k.s,box:k.b}))};
+}
+
+// ============================================================================
+// Selection + running
+// ============================================================================
+function selectNode(id) {
+  _selectedNodeId = id; _dependencyIds = traceDeps(id); renderGraph(id);
+  const node = NODE_MAP[id]; const el = document.getElementById('nodeInfo');
+  el.innerHTML = '<strong>' + node.label + '</strong> (' + node.id + ')<br>type: ' + node.type + ' | shape: ' + JSON.stringify(node.shape) + (node.detail?'<br>'+node.detail:'') + '<br>deps: ' + (_dependencyIds.size-1) + ' nodes';
+}
+
+async function runSelected() {
+  const btn = document.getElementById('runBtn');
+  if (!_selectedNodeId) { alert('Click a node first.'); return; }
+  try {
+    btn.disabled = true;
+    document.getElementById('status').className = 'status info';
+    document.getElementById('status').textContent = 'Building postprocessing subgraph...';
+    const main = await buildPostprocessSubgraph(_selectedNodeId);
+    document.getElementById('status').className = 'status success';
+    document.getElementById('status').textContent = NODE_MAP[_selectedNodeId].label + ' | ' + main.inferTime.toFixed(2) + 'ms';
+    document.getElementById('resultsCard').style.display = '';
+    document.getElementById('results').innerHTML =
+      '<div><strong>' + _selectedNodeId + '</strong> shape=' + JSON.stringify(main.shape) + '</div>' +
+      '<pre>[' + Array.from(main.result.slice(0,32)).map(v=>v.toFixed(6)).join(',') + (main.result.length>32?', ...':'') + ']</pre>';
+  } catch (err) {
+    document.getElementById('status').className = 'status error';
+    document.getElementById('status').textContent = 'Error: ' + err.message;
+  } finally { btn.disabled = false; }
+}
+
+async function runAll() {
+  const btn = document.getElementById('runAllBtn');
+  try {
+    btn.disabled = true;
+    const ops = NODES.filter(n => n.type !== 'input' && n.type !== 'constant');
+    document.getElementById('resultsCard').style.display = '';
+    let html = '<table style="width:100%;border-collapse:collapse;font-size:0.7rem;"><tr style="color:#666;"><th>Node</th><th>Type</th><th>Shape</th><th>ms</th></tr>';
+    for (const node of ops) {
+      document.getElementById('status').className='status info';document.getElementById('status').textContent='Running '+node.id+'...';
+      try {
+        const m = await buildPostprocessSubgraph(node.id);
+        html += '<tr><td><b>'+node.id+'</b></td><td>'+node.type+'</td><td>'+JSON.stringify(m.shape)+'</td><td>'+m.inferTime.toFixed(2)+'</td></tr>';
+      } catch(e) { html+='<tr style="background:#ffebee;"><td>'+node.id+'</td><td>'+node.type+'</td><td colspan="2">ERR:'+e.message+'</td></tr>'; }
+    }
+    html+='</table>';document.getElementById('results').innerHTML=html;
+    document.getElementById('status').className='status success';document.getElementById('status').textContent=ops.length+' nodes done.';
+  } catch(err) { document.getElementById('status').className='status error';document.getElementById('status').textContent='Error: '+err.message; }
+  finally { btn.disabled = false; }
+}
+
+// ============================================================================
+// Comparison
+// ============================================================================
+function compareWithJS() {
+  if (!_jsBoxData || !_graphBoxData) { alert('Run "Generate & Run" first.'); return; }
+  const NA = 8400;
+  let html = '';
+  let maxDiff = 0, maxDiffLoc = -1, diffCount = 0;
+
+  // Compare scores (channel 0)
+  for (let a = 0; a < NA; a++) {
+    const d = Math.abs(_jsScoreData[a] - _graphScoreData[a]);
+    if (d > 1e-5) diffCount++;
+    if (d > maxDiff) { maxDiff = d; maxDiffLoc = a; }
+  }
+
+  html += '<strong>Scores</strong> [8400]: ' + diffCount + ' diffs > 1e-5, max diff=' + maxDiff.toExponential(2);
+  if (maxDiffLoc >= 0) html += ' at a=' + maxDiffLoc + ' (JS=' + _jsScoreData[maxDiffLoc].toFixed(6) + ' Graph=' + _graphScoreData[maxDiffLoc].toFixed(6) + ')';
+  html += '<br>';
+
+  // Compare boxes
+  let boxDiff = 0, boxMax = 0, boxMaxLoc = -1;
+  for (let a = 0; a < NA; a++) {
+    for (let c = 0; c < 4; c++) {
+      const d = Math.abs(_jsBoxData[c*NA+a] - _graphBoxData[c*NA+a]);
+      boxDiff += d;
+      if (d > boxMax) { boxMax = d; boxMaxLoc = a; }
+    }
+  }
+  html += '<strong>Boxes</strong> [4×8400]: avg diff=' + (boxDiff/(4*NA)).toExponential(2) + ', max=' + boxMax.toExponential(2);
+  if (boxMaxLoc >= 0) {
+    html += ' at a=' + boxMaxLoc + '<br>';
+    html += 'JS:   [' + ['x1','y1','x2','y2'].map((l,i)=>l+'='+_jsBoxData[i*NA+boxMaxLoc].toFixed(4)).join(', ') + ']<br>';
+    html += 'Graph: [' + ['x1','y1','x2','y2'].map((l,i)=>l+'='+_graphBoxData[i*NA+boxMaxLoc].toFixed(4)).join(', ') + ']';
+  }
+  html += '<br>';
+
+  // Overall verdict
+  if (maxDiff < 1e-4 && boxMax < 1e-3) {
+    html += '<br><b class="diff-same">✓ Graph and JS outputs match</b>';
+  } else {
+    html += '<br><b class="diff-diff">✗ Mismatch detected — check DFL or dist2bbox</b>';
+  }
+
+  document.getElementById('compareCard').style.display = '';
+  document.getElementById('compareResult').innerHTML = html;
+}
+
+// Init
+window.addEventListener('load', () => selectNode('output0'));
+  </script>
+</body>
+</html>

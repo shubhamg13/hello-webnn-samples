@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>YOLOv8s Detection · WebNN</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f5f5f5; color: #1a1a1a; padding: 1.5rem; }
+    .container { max-width: 1000px; margin: 0 auto; }
+    h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+    .subtitle { color: #666; font-size: 0.85rem; margin-bottom: 1rem; }
+    .card { background: #fff; border-radius: 6px; padding: 1rem 1.25rem; margin-bottom: 0.75rem; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .controls { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; }
+    label { font-weight: 600; font-size: 0.85rem; }
+    select, button { padding: 0.3rem 0.75rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.85rem; cursor: pointer; }
+    button { background: rgba(0,47,167,1); color: #fff; border: none; font-weight: 500; }
+    button:hover { background: rgba(0,47,167,0.85); }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    .status { padding: 0.6rem 1rem; font-size: 0.85rem; border-radius: 4px; margin-bottom: 0.75rem; }
+    .status.info { background: #e3f2fd; border-left: 3px solid #2196F3; }
+    .status.success { background: #e9f8f0; border-left: 3px solid #068906; }
+    .status.error { background: #ffebee; border-left: 3px solid #f44336; }
+    .image-wrapper { text-align: center; margin: 1rem 0; }
+    .image-container { position: relative; display: inline-block; line-height: 0; }
+    #image { max-width: 100%; max-height: 55vh; display: block; }
+    #overlay {
+      position: absolute; top: 0; left: 0; pointer-events: none; overflow: visible;
+    }
+    .det-rect { fill: none; stroke-width: 0.3; vector-effect: non-scaling-stroke; }
+    .det-label { font-size: 1.4px; font-weight: 600; font-family: system-ui, sans-serif; }
+    table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.8rem; }
+    th, td { text-align: left; padding: 0.35rem 0.5rem; border-bottom: 1px solid #eee; }
+    th { color: #666; font-weight: 600; white-space: nowrap; }
+    td { font-family: monospace; font-size: 0.75rem; }
+    pre { margin: 0.35rem 0; background: #f5f5f5; padding: 0.4rem 0.75rem; overflow-x: auto; font-size: 0.75rem; max-height: 150px; white-space: pre-wrap; word-break: break-all; }
+    .section-label { font-size: 0.8rem; font-weight: 600; color: #666; margin-top: 0.75rem; margin-bottom: 0.3rem; }
+    #resultsCard { display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>YOLOv8s Detection</h1>
+    <p class="subtitle">Object detection via WebNN on CPU / GPU / NPU using YOLOv8s (80 COCO classes)</p>
+
+    <div class="card">
+      <div class="controls">
+        <label for="deviceSelect">Device:</label>
+        <select id="deviceSelect">
+          <option value="cpu">CPU</option>
+          <option value="gpu">GPU</option>
+          <option value="npu">NPU</option>
+        </select>
+        <input type="file" id="imageInput" accept="image/*" style="display:none">
+        <button id="uploadBtn" onclick="document.getElementById('imageInput').click()">Choose Image</button>
+        <label>Conf:</label>
+        <input type="number" id="confThreshold" value="0.25" step="0.05" min="0" max="1" style="width:60px;padding:0.3rem 0.4rem;border:1px solid #ddd;border-radius:4px;font-size:0.85rem;">
+        <label>IoU:</label>
+        <input type="number" id="iouThreshold" value="0.45" step="0.05" min="0" max="1" style="width:60px;padding:0.3rem 0.4rem;border:1px solid #ddd;border-radius:4px;font-size:0.85rem;">
+        <button id="runBtn" onclick="runDetection()">Run Detection</button>
+      </div>
+    </div>
+
+    <div id="status" class="status info">Ready. Select a device and click Run Detection.</div>
+
+    <div class="image-wrapper">
+      <div class="image-container">
+        <img id="image" src="../assets/portrait.jpg" alt="Input image">
+        <svg id="overlay" viewBox="0 0 100 100" preserveAspectRatio="none"></svg>
+      </div>
+    </div>
+
+    <div class="card" id="resultsCard">
+      <h3>Results</h3>
+      <div id="results"></div>
+    </div>
+  </div>
+
+  <script src="../yolov8s-webnn/yolov8s.js"></script>
+  <script>
+    // ============ COCO CLASSES ============
+    const COCO_CLASSES = [
+      'person','bicycle','car','motorcycle','airplane','bus','train','truck','boat',
+      'traffic light','fire hydrant','stop sign','parking meter','bench','bird','cat',
+      'dog','horse','sheep','cow','elephant','bear','zebra','giraffe','backpack',
+      'umbrella','handbag','tie','suitcase','frisbee','skis','snowboard','sports ball',
+      'kite','baseball bat','baseball glove','skateboard','surfboard','tennis racket',
+      'bottle','wine glass','cup','fork','knife','spoon','bowl','banana','apple',
+      'sandwich','orange','broccoli','carrot','hot dog','pizza','donut','cake','chair',
+      'couch','potted plant','bed','dining table','toilet','tv','laptop','mouse',
+      'remote','keyboard','cell phone','microwave','oven','toaster','sink',
+      'refrigerator','book','clock','vase','scissors','teddy bear','hair drier','toothbrush'
+    ];
+
+    const CLASS_COLORS = [
+      '#FF3838','#FF9D97','#FF701F','#FFB21D','#CFD231','#48F90A','#92CC17','#3DDB86',
+      '#1A9334','#00D4BB','#2C99A8','#00C2FF','#344593','#6473FF','#0018EC','#8438FF',
+      '#520085','#CB38FF','#FF95C8','#FF37C7'
+    ];
+
+    const INPUT_SIZE = 640;
+
+    // ============ IMAGE PREPROCESSING ============
+    function preprocessImage(imageElement) {
+      const origW = imageElement.naturalWidth;
+      const origH = imageElement.naturalHeight;
+      const scale = Math.min(INPUT_SIZE / origW, INPUT_SIZE / origH);
+      const newW = Math.round(origW * scale);
+      const newH = Math.round(origH * scale);
+      const padX = Math.round((INPUT_SIZE - newW) / 2);
+      const padY = Math.round((INPUT_SIZE - newH) / 2);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = INPUT_SIZE;
+      canvas.height = INPUT_SIZE;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#727272';
+      ctx.fillRect(0, 0, INPUT_SIZE, INPUT_SIZE);
+      ctx.drawImage(imageElement, padX, padY, newW, newH);
+
+      const imageData = ctx.getImageData(0, 0, INPUT_SIZE, INPUT_SIZE);
+      const data = imageData.data;
+
+      // NCHW layout: R plane, then G plane, then B plane
+      const rPlane = new Float32Array(INPUT_SIZE * INPUT_SIZE);
+      const gPlane = new Float32Array(INPUT_SIZE * INPUT_SIZE);
+      const bPlane = new Float32Array(INPUT_SIZE * INPUT_SIZE);
+      for (let i = 0; i < INPUT_SIZE * INPUT_SIZE; i++) {
+        rPlane[i] = data[i * 4] / 255;
+        gPlane[i] = data[i * 4 + 1] / 255;
+        bPlane[i] = data[i * 4 + 2] / 255;
+      }
+
+      const tensor = new Float32Array(3 * INPUT_SIZE * INPUT_SIZE);
+      tensor.set(rPlane, 0);
+      tensor.set(gPlane, INPUT_SIZE * INPUT_SIZE);
+      tensor.set(bPlane, 2 * INPUT_SIZE * INPUT_SIZE);
+
+      return { tensor, padX, padY, scale, origW, origH };
+    }
+
+    // ============ POST-PROCESSING ============
+    function postprocess(outputData, scaleInfo, confThreshold, iouThreshold) {
+      const { padX, padY, scale, origW, origH } = scaleInfo;
+      const numAnchors = 8400;
+      const numClasses = 80;
+
+      // outputData is [1, 84, 8400] in row-major: outputData[i*8400 + j]
+      // Row 0-3: cx, cy, w, h (in 640x640 space, but actually decoded to original-ish)
+      // Row 4-83: class scores
+
+      const detections = [];
+      for (let j = 0; j < numAnchors; j++) {
+        const cx = outputData[0 * numAnchors + j];
+        const cy = outputData[1 * numAnchors + j];
+        const w  = outputData[2 * numAnchors + j];
+        const h  = outputData[3 * numAnchors + j];
+
+        let maxScore = 0, maxClass = 0;
+        for (let c = 0; c < numClasses; c++) {
+          const score = outputData[(4 + c) * numAnchors + j];
+          if (score > maxScore) { maxScore = score; maxClass = c; }
+        }
+
+        if (maxScore < confThreshold) continue;
+
+        // Convert cx,cy,w,h to x1,y1,x2,y2 in 640x640 space
+        const x1 = cx - w / 2;
+        const y1 = cy - h / 2;
+        const x2 = cx + w / 2;
+        const y2 = cy + h / 2;
+
+        // Scale back from 640x640 letterbox space to original image
+        const fx1 = (x1 - padX) / scale;
+        const fy1 = (y1 - padY) / scale;
+        const fx2 = (x2 - padX) / scale;
+        const fy2 = (y2 - padY) / scale;
+
+        detections.push({
+          x1: Math.max(0, fx1),
+          y1: Math.max(0, fy1),
+          x2: Math.min(origW, fx2),
+          y2: Math.min(origH, fy2),
+          score: maxScore,
+          classId: maxClass
+        });
+      }
+
+      return nms(detections, iouThreshold);
+    }
+
+    function nms(detections, iouThreshold) {
+      if (detections.length === 0) return [];
+      // Sort by score descending
+      detections.sort((a, b) => b.score - a.score);
+      const keep = [];
+
+      while (detections.length > 0) {
+        const current = detections.shift();
+        keep.push(current);
+        const remaining = [];
+        for (const d of detections) {
+          if (d.classId !== current.classId) {
+            remaining.push(d);
+            continue;
+          }
+          const iou = computeIoU(
+            current.x1, current.y1, current.x2, current.y2,
+            d.x1, d.y1, d.x2, d.y2
+          );
+          if (iou < iouThreshold) remaining.push(d);
+        }
+        detections = remaining;
+      }
+      return keep;
+    }
+
+    function computeIoU(ax1, ay1, ax2, ay2, bx1, by1, bx2, by2) {
+      const ix1 = Math.max(ax1, bx1);
+      const iy1 = Math.max(ay1, by1);
+      const ix2 = Math.min(ax2, bx2);
+      const iy2 = Math.min(ay2, by2);
+      if (ix2 <= ix1 || iy2 <= iy1) return 0;
+      const iArea = (ix2 - ix1) * (iy2 - iy1);
+      const aArea = (ax2 - ax1) * (ay2 - ay1);
+      const bArea = (bx2 - bx1) * (by2 - by1);
+      return iArea / (aArea + bArea - iArea);
+    }
+
+    // ============ DRAWING ============
+    function drawDetections(overlayEl, detections, origW, origH) {
+      const svgNS = 'http://www.w3.org/2000/svg';
+      for (const det of detections) {
+        const color = CLASS_COLORS[det.classId % CLASS_COLORS.length];
+
+        const rect = document.createElementNS(svgNS, 'rect');
+        rect.setAttribute('x', ((det.x1 / origW) * 100).toFixed(4));
+        rect.setAttribute('y', ((det.y1 / origH) * 100).toFixed(4));
+        rect.setAttribute('width', (((det.x2 - det.x1) / origW) * 100).toFixed(4));
+        rect.setAttribute('height', (((det.y2 - det.y1) / origH) * 100).toFixed(4));
+        rect.setAttribute('class', 'det-rect');
+        rect.style.stroke = color;
+        overlayEl.appendChild(rect);
+
+        const label = document.createElementNS(svgNS, 'text');
+        label.setAttribute('x', ((det.x1 / origW) * 100).toFixed(4));
+        label.setAttribute('y', ((det.y1 / origH) * 100 - 0.6).toFixed(4));
+        label.setAttribute('class', 'det-label');
+        label.style.fill = color;
+        const clsName = COCO_CLASSES[det.classId] || ('cls' + det.classId);
+        label.textContent = clsName + ' ' + (det.score * 100).toFixed(0) + '%';
+        overlayEl.appendChild(label);
+      }
+    }
+
+    // ============ MAIN FLOW ============
+    async function runDetection() {
+      const statusEl = document.getElementById('status');
+      const runBtn = document.getElementById('runBtn');
+      const imageEl = document.getElementById('image');
+      const overlayEl = document.getElementById('overlay');
+      const resultsCard = document.getElementById('resultsCard');
+      const resultsEl = document.getElementById('results');
+      const deviceType = document.getElementById('deviceSelect').value;
+      const confThreshold = parseFloat(document.getElementById('confThreshold').value) || 0.25;
+      const iouThreshold = parseFloat(document.getElementById('iouThreshold').value) || 0.45;
+
+      try {
+        runBtn.disabled = true;
+        resultsCard.style.display = 'none';
+        statusEl.className = 'status info';
+        statusEl.textContent = 'Checking WebNN support...';
+
+        if (!navigator.ml) {
+          throw new Error('WebNN is not supported. Use Chrome 147+ with WebNN flags enabled.');
+        }
+
+        if (!imageEl.complete) {
+          statusEl.textContent = 'Waiting for image to load...';
+          await new Promise(resolve => { imageEl.onload = resolve; });
+        }
+
+        const rect0 = imageEl.getBoundingClientRect();
+        overlayEl.style.width = rect0.width + 'px';
+        overlayEl.style.height = rect0.height + 'px';
+        overlayEl.innerHTML = '';
+
+        statusEl.textContent = 'Preprocessing image...';
+        const { tensor, padX, padY, scale, origW, origH } = preprocessImage(imageEl);
+
+        statusEl.textContent = 'Creating context (' + deviceType.toUpperCase() + ')...';
+        const context = await navigator.ml.createContext({ deviceType });
+
+        statusEl.textContent = 'Loading weights...';
+        const weights = await WeightsFile.load(
+          '../yolov8s-webnn/yolov8s.weights',
+          '../yolov8s-webnn/yolov8s.manifest.json'
+        );
+
+        statusEl.textContent = 'Building graph...';
+        const buildStart = performance.now();
+        const graphResult = await buildGraph(context, weights);
+        const buildTime = (performance.now() - buildStart).toFixed(2);
+
+        statusEl.textContent = 'Running WebNN inference...';
+        const inputTensor = await context.createTensor({
+          dataType: 'float32', shape: [1, 3, INPUT_SIZE, INPUT_SIZE], writable: true
+        });
+        context.writeTensor(inputTensor, tensor);
+
+        const outShape = graphResult.outputShapes['output0'];
+        const outputTensor = await context.createTensor({
+          dataType: 'float32', shape: outShape, readable: true
+        });
+
+        const inferStart = performance.now();
+        context.dispatch(graphResult.graph,
+          { 'images': inputTensor },
+          { 'output0': outputTensor }
+        );
+        const outputData = new Float32Array(await context.readTensor(outputTensor));
+        const inferTime = (performance.now() - inferStart).toFixed(2);
+
+        statusEl.textContent = 'Post-processing results...';
+        const detections = postprocess(outputData, { padX, padY, scale, origW, origH }, confThreshold, iouThreshold);
+
+        const rect1 = imageEl.getBoundingClientRect();
+        overlayEl.style.width = rect1.width + 'px';
+        overlayEl.style.height = rect1.height + 'px';
+        if (detections.length > 0) {
+          drawDetections(overlayEl, detections, origW, origH);
+        }
+
+        statusEl.className = 'status success';
+        statusEl.textContent = 'Build: ' + buildTime + 'ms | Inference: ' + inferTime + 'ms | Found ' + detections.length + ' object(s) on ' + deviceType.toUpperCase() + ' (conf≥' + confThreshold + ', IoU≥' + iouThreshold + ')';
+
+        window._lastOutput = outputData;
+
+        resultsCard.style.display = 'block';
+        let html = '';
+
+        html += '<div class="section-label">Timing</div>';
+        html += '<table><tr><th>Phase</th><th>Time</th><th>Device</th></tr>';
+        html += '<tr><td>Graph build</td><td>' + buildTime + 'ms</td><td>' + deviceType.toUpperCase() + '</td></tr>';
+        html += '<tr><td>Inference (1 run)</td><td>' + inferTime + 'ms</td><td>' + deviceType.toUpperCase() + '</td></tr>';
+        html += '</table>';
+
+        html += '<div class="section-label">Raw Output</div>';
+        html += '<div style="margin-bottom:0.5rem;">';
+        html += '<strong>output0</strong> [1,84,8400] (float32) &mdash; ' + outputData.length + ' values';
+        html += ' <button onclick="copyOutput()" style="font-size:0.7rem;padding:1px 6px;vertical-align:middle;background:#666;">copy first 100</button>';
+        html += '</div>';
+        html += '<pre>[' + Array.from(outputData.slice(0, 16)).map(v => v.toFixed(6)).join(', ') + ', ...]</pre>';
+
+        html += '<div class="section-label">Detections (' + detections.length + ' object' + (detections.length !== 1 ? 's' : '') + ')</div>';
+        if (detections.length > 0) {
+          html += '<table><thead><tr>';
+          html += '<th>#</th><th>Class</th><th>Score</th><th>x1</th><th>y1</th><th>x2</th><th>y2</th>';
+          html += '</tr></thead><tbody>';
+          detections.forEach((det, idx) => {
+            html += '<tr>';
+            html += '<td>' + (idx + 1) + '</td>';
+            html += '<td>' + COCO_CLASSES[det.classId] + ' (' + det.classId + ')</td>';
+            html += '<td>' + (det.score * 100).toFixed(1) + '%</td>';
+            html += '<td>' + det.x1.toFixed(1) + '</td>';
+            html += '<td>' + det.y1.toFixed(1) + '</td>';
+            html += '<td>' + det.x2.toFixed(1) + '</td>';
+            html += '<td>' + det.y2.toFixed(1) + '</td>';
+            html += '</tr>';
+          });
+          html += '</tbody></table>';
+        } else {
+          html += '<div style="color:#999;font-size:0.85rem;">No objects detected above threshold.</div>';
+        }
+
+        resultsEl.innerHTML = html;
+
+      } catch (err) {
+        statusEl.className = 'status error';
+        statusEl.textContent = 'Error: ' + err.message;
+        console.error(err);
+      } finally {
+        runBtn.disabled = false;
+      }
+    }
+
+    function copyOutput() {
+      const arr = window._lastOutput;
+      if (!arr) return;
+      navigator.clipboard.writeText('[' + Array.from(arr.slice(0, 100)).map(v => v.toFixed(6)).join(', ') + ']')
+        .then(() => {
+          document.getElementById('status').textContent = 'Copied first 100 values to clipboard.';
+        }).catch(() => {});
+    }
+
+    // ============ INIT ============
+    window.addEventListener('load', () => {
+      const imageInput = document.getElementById('imageInput');
+      const imageEl = document.getElementById('image');
+      const overlayEl = document.getElementById('overlay');
+      const statusEl = document.getElementById('status');
+
+      imageInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const url = URL.createObjectURL(file);
+        imageEl.src = url;
+        overlayEl.innerHTML = '';
+        statusEl.className = 'status info';
+        statusEl.textContent = 'Image loaded. Select device and click Run Detection.';
+        document.getElementById('resultsCard').style.display = 'none';
+      });
+
+      imageEl.addEventListener('load', () => {
+        requestAnimationFrame(() => {
+          const r = imageEl.getBoundingClientRect();
+          overlayEl.style.width = r.width + 'px';
+          overlayEl.style.height = r.height + 'px';
+        });
+      });
+    });
+  </script>
+</body>
+</html>

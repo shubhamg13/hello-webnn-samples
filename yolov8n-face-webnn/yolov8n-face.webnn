@@ -1,0 +1,629 @@
+webnn_graph "yolov8n-face" v1 {
+  inputs {
+    images: f32[1, 3, 640, 640];
+  }
+
+  consts {
+    model.0.conv.weight: f32[16, 3, 3, 3] @weights("model.0.conv.weight");
+    model.0.conv.bias: f32[16] @weights("model.0.conv.bias");
+    model.1.conv.bias: f32[32] @weights("model.1.conv.bias");
+    model.2.cv1.conv.bias: f32[32] @weights("model.2.cv1.conv.bias");
+    model.2.cv2.conv.bias: f32[32] @weights("model.2.cv2.conv.bias");
+    model.2.m.0.cv1.conv.bias: f32[16] @weights("model.2.m.0.cv1.conv.bias");
+    model.2.m.0.cv2.conv.bias: f32[16] @weights("model.2.m.0.cv2.conv.bias");
+    model.3.conv.bias: f32[64] @weights("model.3.conv.bias");
+    model.4.cv1.conv.bias: f32[64] @weights("model.4.cv1.conv.bias");
+    model.4.cv2.conv.bias: f32[64] @weights("model.4.cv2.conv.bias");
+    model.4.m.0.cv1.conv.bias: f32[32] @weights("model.4.m.0.cv1.conv.bias");
+    model.4.m.0.cv2.conv.bias: f32[32] @weights("model.4.m.0.cv2.conv.bias");
+    model.4.m.1.cv1.conv.bias: f32[32] @weights("model.4.m.1.cv1.conv.bias");
+    model.4.m.1.cv2.conv.bias: f32[32] @weights("model.4.m.1.cv2.conv.bias");
+    model.5.conv.bias: f32[128] @weights("model.5.conv.bias");
+    model.6.cv1.conv.bias: f32[128] @weights("model.6.cv1.conv.bias");
+    model.6.cv2.conv.bias: f32[128] @weights("model.6.cv2.conv.bias");
+    model.6.m.0.cv1.conv.bias: f32[64] @weights("model.6.m.0.cv1.conv.bias");
+    model.6.m.0.cv2.conv.bias: f32[64] @weights("model.6.m.0.cv2.conv.bias");
+    model.6.m.1.cv1.conv.bias: f32[64] @weights("model.6.m.1.cv1.conv.bias");
+    model.6.m.1.cv2.conv.bias: f32[64] @weights("model.6.m.1.cv2.conv.bias");
+    model.7.conv.bias: f32[256] @weights("model.7.conv.bias");
+    model.8.cv1.conv.bias: f32[256] @weights("model.8.cv1.conv.bias");
+    model.8.cv2.conv.bias: f32[256] @weights("model.8.cv2.conv.bias");
+    model.8.m.0.cv1.conv.bias: f32[128] @weights("model.8.m.0.cv1.conv.bias");
+    model.8.m.0.cv2.conv.bias: f32[128] @weights("model.8.m.0.cv2.conv.bias");
+    model.9.cv1.conv.bias: f32[128] @weights("model.9.cv1.conv.bias");
+    model.9.cv2.conv.bias: f32[256] @weights("model.9.cv2.conv.bias");
+    model.12.cv1.conv.bias: f32[128] @weights("model.12.cv1.conv.bias");
+    model.12.cv2.conv.bias: f32[128] @weights("model.12.cv2.conv.bias");
+    model.12.m.0.cv1.conv.bias: f32[64] @weights("model.12.m.0.cv1.conv.bias");
+    model.12.m.0.cv2.conv.bias: f32[64] @weights("model.12.m.0.cv2.conv.bias");
+    model.15.cv1.conv.bias: f32[64] @weights("model.15.cv1.conv.bias");
+    model.15.cv2.conv.bias: f32[64] @weights("model.15.cv2.conv.bias");
+    model.15.m.0.cv1.conv.bias: f32[32] @weights("model.15.m.0.cv1.conv.bias");
+    model.15.m.0.cv2.conv.bias: f32[32] @weights("model.15.m.0.cv2.conv.bias");
+    model.16.conv.bias: f32[64] @weights("model.16.conv.bias");
+    model.18.cv1.conv.bias: f32[128] @weights("model.18.cv1.conv.bias");
+    model.18.cv2.conv.bias: f32[128] @weights("model.18.cv2.conv.bias");
+    model.18.m.0.cv1.conv.bias: f32[64] @weights("model.18.m.0.cv1.conv.bias");
+    model.18.m.0.cv2.conv.bias: f32[64] @weights("model.18.m.0.cv2.conv.bias");
+    model.19.conv.bias: f32[128] @weights("model.19.conv.bias");
+    model.21.cv1.conv.bias: f32[256] @weights("model.21.cv1.conv.bias");
+    model.21.cv2.conv.bias: f32[256] @weights("model.21.cv2.conv.bias");
+    model.21.m.0.cv1.conv.bias: f32[128] @weights("model.21.m.0.cv1.conv.bias");
+    model.21.m.0.cv2.conv.bias: f32[128] @weights("model.21.m.0.cv2.conv.bias");
+    model.22.cv2.0.0.conv.bias: f32[64] @weights("model.22.cv2.0.0.conv.bias");
+    model.22.cv2.0.1.conv.bias: f32[64] @weights("model.22.cv2.0.1.conv.bias");
+    model.22.cv2.0.2.bias: f32[64] @weights("model.22.cv2.0.2.bias");
+    model.22.cv2.1.0.conv.bias: f32[64] @weights("model.22.cv2.1.0.conv.bias");
+    model.22.cv2.1.1.conv.bias: f32[64] @weights("model.22.cv2.1.1.conv.bias");
+    model.22.cv2.1.2.bias: f32[64] @weights("model.22.cv2.1.2.bias");
+    model.22.cv2.2.0.conv.bias: f32[64] @weights("model.22.cv2.2.0.conv.bias");
+    model.22.cv2.2.1.conv.bias: f32[64] @weights("model.22.cv2.2.1.conv.bias");
+    model.22.cv2.2.2.bias: f32[64] @weights("model.22.cv2.2.2.bias");
+    model.22.cv3.0.0.conv.bias: f32[64] @weights("model.22.cv3.0.0.conv.bias");
+    model.22.cv3.0.1.conv.bias: f32[64] @weights("model.22.cv3.0.1.conv.bias");
+    model.22.cv3.0.2.weight: f32[1, 64, 1, 1] @weights("model.22.cv3.0.2.weight");
+    model.22.cv3.0.2.bias: f32[1] @weights("model.22.cv3.0.2.bias");
+    model.22.cv3.1.0.conv.bias: f32[64] @weights("model.22.cv3.1.0.conv.bias");
+    model.22.cv3.1.1.conv.bias: f32[64] @weights("model.22.cv3.1.1.conv.bias");
+    model.22.cv3.1.2.weight: f32[1, 64, 1, 1] @weights("model.22.cv3.1.2.weight");
+    model.22.cv3.1.2.bias: f32[1] @weights("model.22.cv3.1.2.bias");
+    model.22.cv3.2.0.conv.bias: f32[64] @weights("model.22.cv3.2.0.conv.bias");
+    model.22.cv3.2.1.conv.bias: f32[64] @weights("model.22.cv3.2.1.conv.bias");
+    model.22.cv3.2.2.weight: f32[1, 64, 1, 1] @weights("model.22.cv3.2.2.weight");
+    model.22.cv3.2.2.bias: f32[1] @weights("model.22.cv3.2.2.bias");
+    model.22.cv4.0.0.conv.bias: f32[16] @weights("model.22.cv4.0.0.conv.bias");
+    model.22.cv4.0.1.conv.bias: f32[16] @weights("model.22.cv4.0.1.conv.bias");
+    model.22.cv4.0.2.weight: f32[15, 16, 1, 1] @weights("model.22.cv4.0.2.weight");
+    model.22.cv4.0.2.bias: f32[15] @weights("model.22.cv4.0.2.bias");
+    model.22.cv4.1.0.conv.bias: f32[16] @weights("model.22.cv4.1.0.conv.bias");
+    model.22.cv4.1.1.conv.bias: f32[16] @weights("model.22.cv4.1.1.conv.bias");
+    model.22.cv4.1.2.weight: f32[15, 16, 1, 1] @weights("model.22.cv4.1.2.weight");
+    model.22.cv4.1.2.bias: f32[15] @weights("model.22.cv4.1.2.bias");
+    model.22.cv4.2.0.conv.bias: f32[16] @weights("model.22.cv4.2.0.conv.bias");
+    model.22.cv4.2.1.conv.bias: f32[16] @weights("model.22.cv4.2.1.conv.bias");
+    model.22.cv4.2.2.weight: f32[15, 16, 1, 1] @weights("model.22.cv4.2.2.weight");
+    model.22.cv4.2.2.bias: f32[15] @weights("model.22.cv4.2.2.bias");
+    model.1.conv.weight: f32[32, 16, 3, 3] @weights("model.1.conv.weight");
+    model.2.cv1.conv.weight: f32[32, 32, 1, 1] @weights("model.2.cv1.conv.weight");
+    model.2.cv2.conv.weight: f32[32, 48, 1, 1] @weights("model.2.cv2.conv.weight");
+    model.2.m.0.cv1.conv.weight: f32[16, 16, 3, 3] @weights("model.2.m.0.cv1.conv.weight");
+    model.2.m.0.cv2.conv.weight: f32[16, 16, 3, 3] @weights("model.2.m.0.cv2.conv.weight");
+    model.3.conv.weight: f32[64, 32, 3, 3] @weights("model.3.conv.weight");
+    model.4.cv1.conv.weight: f32[64, 64, 1, 1] @weights("model.4.cv1.conv.weight");
+    model.4.cv2.conv.weight: f32[64, 128, 1, 1] @weights("model.4.cv2.conv.weight");
+    model.4.m.0.cv1.conv.weight: f32[32, 32, 3, 3] @weights("model.4.m.0.cv1.conv.weight");
+    model.4.m.0.cv2.conv.weight: f32[32, 32, 3, 3] @weights("model.4.m.0.cv2.conv.weight");
+    model.4.m.1.cv1.conv.weight: f32[32, 32, 3, 3] @weights("model.4.m.1.cv1.conv.weight");
+    model.4.m.1.cv2.conv.weight: f32[32, 32, 3, 3] @weights("model.4.m.1.cv2.conv.weight");
+    model.5.conv.weight: f32[128, 64, 3, 3] @weights("model.5.conv.weight");
+    model.6.cv1.conv.weight: f32[128, 128, 1, 1] @weights("model.6.cv1.conv.weight");
+    model.6.cv2.conv.weight: f32[128, 256, 1, 1] @weights("model.6.cv2.conv.weight");
+    model.6.m.0.cv1.conv.weight: f32[64, 64, 3, 3] @weights("model.6.m.0.cv1.conv.weight");
+    model.6.m.0.cv2.conv.weight: f32[64, 64, 3, 3] @weights("model.6.m.0.cv2.conv.weight");
+    model.6.m.1.cv1.conv.weight: f32[64, 64, 3, 3] @weights("model.6.m.1.cv1.conv.weight");
+    model.6.m.1.cv2.conv.weight: f32[64, 64, 3, 3] @weights("model.6.m.1.cv2.conv.weight");
+    model.7.conv.weight: f32[256, 128, 3, 3] @weights("model.7.conv.weight");
+    model.8.cv1.conv.weight: f32[256, 256, 1, 1] @weights("model.8.cv1.conv.weight");
+    model.8.cv2.conv.weight: f32[256, 384, 1, 1] @weights("model.8.cv2.conv.weight");
+    model.8.m.0.cv1.conv.weight: f32[128, 128, 3, 3] @weights("model.8.m.0.cv1.conv.weight");
+    model.8.m.0.cv2.conv.weight: f32[128, 128, 3, 3] @weights("model.8.m.0.cv2.conv.weight");
+    model.9.cv1.conv.weight: f32[128, 256, 1, 1] @weights("model.9.cv1.conv.weight");
+    model.9.cv2.conv.weight: f32[256, 512, 1, 1] @weights("model.9.cv2.conv.weight");
+    model.12.cv1.conv.weight: f32[128, 384, 1, 1] @weights("model.12.cv1.conv.weight");
+    model.12.cv2.conv.weight: f32[128, 192, 1, 1] @weights("model.12.cv2.conv.weight");
+    model.12.m.0.cv1.conv.weight: f32[64, 64, 3, 3] @weights("model.12.m.0.cv1.conv.weight");
+    model.12.m.0.cv2.conv.weight: f32[64, 64, 3, 3] @weights("model.12.m.0.cv2.conv.weight");
+    model.15.cv1.conv.weight: f32[64, 192, 1, 1] @weights("model.15.cv1.conv.weight");
+    model.15.cv2.conv.weight: f32[64, 96, 1, 1] @weights("model.15.cv2.conv.weight");
+    model.15.m.0.cv1.conv.weight: f32[32, 32, 3, 3] @weights("model.15.m.0.cv1.conv.weight");
+    model.15.m.0.cv2.conv.weight: f32[32, 32, 3, 3] @weights("model.15.m.0.cv2.conv.weight");
+    model.16.conv.weight: f32[64, 64, 3, 3] @weights("model.16.conv.weight");
+    model.18.cv1.conv.weight: f32[128, 192, 1, 1] @weights("model.18.cv1.conv.weight");
+    model.18.cv2.conv.weight: f32[128, 192, 1, 1] @weights("model.18.cv2.conv.weight");
+    model.18.m.0.cv1.conv.weight: f32[64, 64, 3, 3] @weights("model.18.m.0.cv1.conv.weight");
+    model.18.m.0.cv2.conv.weight: f32[64, 64, 3, 3] @weights("model.18.m.0.cv2.conv.weight");
+    model.19.conv.weight: f32[128, 128, 3, 3] @weights("model.19.conv.weight");
+    model.21.cv1.conv.weight: f32[256, 384, 1, 1] @weights("model.21.cv1.conv.weight");
+    model.21.cv2.conv.weight: f32[256, 384, 1, 1] @weights("model.21.cv2.conv.weight");
+    model.21.m.0.cv1.conv.weight: f32[128, 128, 3, 3] @weights("model.21.m.0.cv1.conv.weight");
+    model.21.m.0.cv2.conv.weight: f32[128, 128, 3, 3] @weights("model.21.m.0.cv2.conv.weight");
+    model.22.cv2.0.0.conv.weight: f32[64, 64, 3, 3] @weights("model.22.cv2.0.0.conv.weight");
+    model.22.cv2.0.1.conv.weight: f32[64, 64, 3, 3] @weights("model.22.cv2.0.1.conv.weight");
+    model.22.cv2.0.2.weight: f32[64, 64, 1, 1] @weights("model.22.cv2.0.2.weight");
+    model.22.cv2.1.0.conv.weight: f32[64, 128, 3, 3] @weights("model.22.cv2.1.0.conv.weight");
+    model.22.cv2.1.1.conv.weight: f32[64, 64, 3, 3] @weights("model.22.cv2.1.1.conv.weight");
+    model.22.cv2.1.2.weight: f32[64, 64, 1, 1] @weights("model.22.cv2.1.2.weight");
+    model.22.cv2.2.0.conv.weight: f32[64, 256, 3, 3] @weights("model.22.cv2.2.0.conv.weight");
+    model.22.cv2.2.1.conv.weight: f32[64, 64, 3, 3] @weights("model.22.cv2.2.1.conv.weight");
+    model.22.cv2.2.2.weight: f32[64, 64, 1, 1] @weights("model.22.cv2.2.2.weight");
+    model.22.cv3.0.0.conv.weight: f32[64, 64, 3, 3] @weights("model.22.cv3.0.0.conv.weight");
+    model.22.cv3.0.1.conv.weight: f32[64, 64, 3, 3] @weights("model.22.cv3.0.1.conv.weight");
+    model.22.cv3.1.0.conv.weight: f32[64, 128, 3, 3] @weights("model.22.cv3.1.0.conv.weight");
+    model.22.cv3.1.1.conv.weight: f32[64, 64, 3, 3] @weights("model.22.cv3.1.1.conv.weight");
+    model.22.cv3.2.0.conv.weight: f32[64, 256, 3, 3] @weights("model.22.cv3.2.0.conv.weight");
+    model.22.cv3.2.1.conv.weight: f32[64, 64, 3, 3] @weights("model.22.cv3.2.1.conv.weight");
+    model.22.cv4.0.0.conv.weight: f32[16, 64, 3, 3] @weights("model.22.cv4.0.0.conv.weight");
+    model.22.cv4.0.1.conv.weight: f32[16, 16, 3, 3] @weights("model.22.cv4.0.1.conv.weight");
+    model.22.cv4.1.0.conv.weight: f32[16, 128, 3, 3] @weights("model.22.cv4.1.0.conv.weight");
+    model.22.cv4.1.1.conv.weight: f32[16, 16, 3, 3] @weights("model.22.cv4.1.1.conv.weight");
+    model.22.cv4.2.0.conv.weight: f32[16, 256, 3, 3] @weights("model.22.cv4.2.0.conv.weight");
+    model.22.cv4.2.1.conv.weight: f32[16, 16, 3, 3] @weights("model.22.cv4.2.1.conv.weight");
+    val_39: i64[4] @weights("val_39");
+    val_47: i64[4] @weights("val_47");
+    val_3: i64[2] @weights("val_3");
+    val_11: i64[2] @weights("val_11");
+    val_19: i64[2] @weights("val_19");
+    val_27: i64[2] @weights("val_27");
+  }
+
+  nodes {
+    # Conv (onnx)
+    conv2d = Conv(images, model.0.conv.weight, model.0.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[2, 2], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_0 = Sigmoid(conv2d);
+    # Mul (onnx)
+    silu = Mul(conv2d, val_0);
+    # Conv (onnx)
+    conv2d_1 = Conv(silu, model.1.conv.weight, model.1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[2, 2], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_1 = Sigmoid(conv2d_1);
+    # Mul (onnx)
+    silu_1 = Mul(conv2d_1, val_1);
+    # Conv (onnx)
+    conv2d_2 = Conv(silu_1, model.2.cv1.conv.weight, model.2.cv1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Sigmoid (onnx)
+    val_2 = Sigmoid(conv2d_2);
+    # Mul (onnx)
+    silu_2 = Mul(conv2d_2, val_2);
+    # Split (onnx)
+    [split_with_sizes_1_split_0, split_with_sizes_1_split_1] = Split(silu_2, val_3, axis=1);
+    # Conv (onnx)
+    conv2d_3 = Conv(split_with_sizes_1_split_1, model.2.m.0.cv1.conv.weight, model.2.m.0.cv1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_5 = Sigmoid(conv2d_3);
+    # Mul (onnx)
+    silu_3 = Mul(conv2d_3, val_5);
+    # Conv (onnx)
+    conv2d_4 = Conv(silu_3, model.2.m.0.cv2.conv.weight, model.2.m.0.cv2.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_6 = Sigmoid(conv2d_4);
+    # Mul (onnx)
+    silu_4 = Mul(conv2d_4, val_6);
+    # Add (onnx)
+    add = Add(split_with_sizes_1_split_1, silu_4);
+    # Concat (onnx)
+    cat = Concat(split_with_sizes_1_split_0, split_with_sizes_1_split_1, add, axis=1);
+    # Conv (onnx)
+    conv2d_5 = Conv(cat, model.2.cv2.conv.weight, model.2.cv2.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Sigmoid (onnx)
+    val_8 = Sigmoid(conv2d_5);
+    # Mul (onnx)
+    silu_5 = Mul(conv2d_5, val_8);
+    # Conv (onnx)
+    conv2d_6 = Conv(silu_5, model.3.conv.weight, model.3.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[2, 2], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_9 = Sigmoid(conv2d_6);
+    # Mul (onnx)
+    silu_6 = Mul(conv2d_6, val_9);
+    # Conv (onnx)
+    conv2d_7 = Conv(silu_6, model.4.cv1.conv.weight, model.4.cv1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Sigmoid (onnx)
+    val_10 = Sigmoid(conv2d_7);
+    # Mul (onnx)
+    silu_7 = Mul(conv2d_7, val_10);
+    # Split (onnx)
+    [split_with_sizes_4_split_0, split_with_sizes_4_split_1] = Split(silu_7, val_11, axis=1);
+    # Conv (onnx)
+    conv2d_8 = Conv(split_with_sizes_4_split_1, model.4.m.0.cv1.conv.weight, model.4.m.0.cv1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_12 = Sigmoid(conv2d_8);
+    # Mul (onnx)
+    silu_8 = Mul(conv2d_8, val_12);
+    # Conv (onnx)
+    conv2d_9 = Conv(silu_8, model.4.m.0.cv2.conv.weight, model.4.m.0.cv2.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_13 = Sigmoid(conv2d_9);
+    # Mul (onnx)
+    silu_9 = Mul(conv2d_9, val_13);
+    # Add (onnx)
+    add_1 = Add(split_with_sizes_4_split_1, silu_9);
+    # Conv (onnx)
+    conv2d_10 = Conv(add_1, model.4.m.1.cv1.conv.weight, model.4.m.1.cv1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_14 = Sigmoid(conv2d_10);
+    # Mul (onnx)
+    silu_10 = Mul(conv2d_10, val_14);
+    # Conv (onnx)
+    conv2d_11 = Conv(silu_10, model.4.m.1.cv2.conv.weight, model.4.m.1.cv2.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_15 = Sigmoid(conv2d_11);
+    # Mul (onnx)
+    silu_11 = Mul(conv2d_11, val_15);
+    # Add (onnx)
+    add_2 = Add(add_1, silu_11);
+    # Concat (onnx)
+    cat_1 = Concat(split_with_sizes_4_split_0, split_with_sizes_4_split_1, add_1, add_2, axis=1);
+    # Conv (onnx)
+    conv2d_12 = Conv(cat_1, model.4.cv2.conv.weight, model.4.cv2.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Sigmoid (onnx)
+    val_16 = Sigmoid(conv2d_12);
+    # Mul (onnx)
+    silu_12 = Mul(conv2d_12, val_16);
+    # Conv (onnx)
+    conv2d_13 = Conv(silu_12, model.5.conv.weight, model.5.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[2, 2], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_17 = Sigmoid(conv2d_13);
+    # Mul (onnx)
+    silu_13 = Mul(conv2d_13, val_17);
+    # Conv (onnx)
+    conv2d_14 = Conv(silu_13, model.6.cv1.conv.weight, model.6.cv1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Sigmoid (onnx)
+    val_18 = Sigmoid(conv2d_14);
+    # Mul (onnx)
+    silu_14 = Mul(conv2d_14, val_18);
+    # Split (onnx)
+    [split_with_sizes_7_split_0, split_with_sizes_7_split_1] = Split(silu_14, val_19, axis=1);
+    # Conv (onnx)
+    conv2d_15 = Conv(split_with_sizes_7_split_1, model.6.m.0.cv1.conv.weight, model.6.m.0.cv1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_20 = Sigmoid(conv2d_15);
+    # Mul (onnx)
+    silu_15 = Mul(conv2d_15, val_20);
+    # Conv (onnx)
+    conv2d_16 = Conv(silu_15, model.6.m.0.cv2.conv.weight, model.6.m.0.cv2.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_21 = Sigmoid(conv2d_16);
+    # Mul (onnx)
+    silu_16 = Mul(conv2d_16, val_21);
+    # Add (onnx)
+    add_3 = Add(split_with_sizes_7_split_1, silu_16);
+    # Conv (onnx)
+    conv2d_17 = Conv(add_3, model.6.m.1.cv1.conv.weight, model.6.m.1.cv1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_22 = Sigmoid(conv2d_17);
+    # Mul (onnx)
+    silu_17 = Mul(conv2d_17, val_22);
+    # Conv (onnx)
+    conv2d_18 = Conv(silu_17, model.6.m.1.cv2.conv.weight, model.6.m.1.cv2.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_23 = Sigmoid(conv2d_18);
+    # Mul (onnx)
+    silu_18 = Mul(conv2d_18, val_23);
+    # Add (onnx)
+    add_4 = Add(add_3, silu_18);
+    # Concat (onnx)
+    cat_2 = Concat(split_with_sizes_7_split_0, split_with_sizes_7_split_1, add_3, add_4, axis=1);
+    # Conv (onnx)
+    conv2d_19 = Conv(cat_2, model.6.cv2.conv.weight, model.6.cv2.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Sigmoid (onnx)
+    val_24 = Sigmoid(conv2d_19);
+    # Mul (onnx)
+    silu_19 = Mul(conv2d_19, val_24);
+    # Conv (onnx)
+    conv2d_20 = Conv(silu_19, model.7.conv.weight, model.7.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[2, 2], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_25 = Sigmoid(conv2d_20);
+    # Mul (onnx)
+    silu_20 = Mul(conv2d_20, val_25);
+    # Conv (onnx)
+    conv2d_21 = Conv(silu_20, model.8.cv1.conv.weight, model.8.cv1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Sigmoid (onnx)
+    val_26 = Sigmoid(conv2d_21);
+    # Mul (onnx)
+    silu_21 = Mul(conv2d_21, val_26);
+    # Split (onnx)
+    [split_with_sizes_10_split_0, split_with_sizes_10_split_1] = Split(silu_21, val_27, axis=1);
+    # Conv (onnx)
+    conv2d_22 = Conv(split_with_sizes_10_split_1, model.8.m.0.cv1.conv.weight, model.8.m.0.cv1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_28 = Sigmoid(conv2d_22);
+    # Mul (onnx)
+    silu_22 = Mul(conv2d_22, val_28);
+    # Conv (onnx)
+    conv2d_23 = Conv(silu_22, model.8.m.0.cv2.conv.weight, model.8.m.0.cv2.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_29 = Sigmoid(conv2d_23);
+    # Mul (onnx)
+    silu_23 = Mul(conv2d_23, val_29);
+    # Add (onnx)
+    add_5 = Add(split_with_sizes_10_split_1, silu_23);
+    # Concat (onnx)
+    cat_3 = Concat(split_with_sizes_10_split_0, split_with_sizes_10_split_1, add_5, axis=1);
+    # Conv (onnx)
+    conv2d_24 = Conv(cat_3, model.8.cv2.conv.weight, model.8.cv2.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Sigmoid (onnx)
+    val_30 = Sigmoid(conv2d_24);
+    # Mul (onnx)
+    silu_24 = Mul(conv2d_24, val_30);
+    # Conv (onnx)
+    conv2d_25 = Conv(silu_24, model.9.cv1.conv.weight, model.9.cv1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Sigmoid (onnx)
+    val_31 = Sigmoid(conv2d_25);
+    # Mul (onnx)
+    silu_25 = Mul(conv2d_25, val_31);
+    # MaxPool (onnx)
+    max_pool2d = MaxPool(silu_25, kernel_shape=[5, 5], strides=[1, 1], dilations=[1, 1], auto_pad="NOTSET", pads=[2, 2, 2, 2], ceil_mode=0, storage_order=0);
+    # MaxPool (onnx)
+    max_pool2d_1 = MaxPool(max_pool2d, kernel_shape=[5, 5], strides=[1, 1], dilations=[1, 1], auto_pad="NOTSET", pads=[2, 2, 2, 2], ceil_mode=0, storage_order=0);
+    # MaxPool (onnx)
+    max_pool2d_2 = MaxPool(max_pool2d_1, kernel_shape=[5, 5], strides=[1, 1], dilations=[1, 1], auto_pad="NOTSET", pads=[2, 2, 2, 2], ceil_mode=0, storage_order=0);
+    # Concat (onnx)
+    cat_4 = Concat(silu_25, max_pool2d, max_pool2d_1, max_pool2d_2, axis=1);
+    # Conv (onnx)
+    conv2d_26 = Conv(cat_4, model.9.cv2.conv.weight, model.9.cv2.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Sigmoid (onnx)
+    val_35 = Sigmoid(conv2d_26);
+    # Mul (onnx)
+    silu_26 = Mul(conv2d_26, val_35);
+    # Resize (onnx)
+    upsample_nearest2d = Resize(silu_26, val_39, mode="nearest", cubic_coeff_a=-0.75, coordinate_transformation_mode="asymmetric", exclude_outside=0, nearest_mode="floor", antialias=0, extrapolation_value=0, keep_aspect_ratio_policy="stretch");
+    # Concat (onnx)
+    cat_5 = Concat(upsample_nearest2d, silu_19, axis=1);
+    # Conv (onnx)
+    conv2d_27 = Conv(cat_5, model.12.cv1.conv.weight, model.12.cv1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Sigmoid (onnx)
+    val_40 = Sigmoid(conv2d_27);
+    # Mul (onnx)
+    silu_27 = Mul(conv2d_27, val_40);
+    # Split (onnx)
+    [split_with_sizes_13_split_0, split_with_sizes_13_split_1] = Split(silu_27, val_19, axis=1);
+    # Conv (onnx)
+    conv2d_28 = Conv(split_with_sizes_13_split_1, model.12.m.0.cv1.conv.weight, model.12.m.0.cv1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_41 = Sigmoid(conv2d_28);
+    # Mul (onnx)
+    silu_28 = Mul(conv2d_28, val_41);
+    # Conv (onnx)
+    conv2d_29 = Conv(silu_28, model.12.m.0.cv2.conv.weight, model.12.m.0.cv2.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_42 = Sigmoid(conv2d_29);
+    # Mul (onnx)
+    silu_29 = Mul(conv2d_29, val_42);
+    # Concat (onnx)
+    cat_6 = Concat(split_with_sizes_13_split_0, split_with_sizes_13_split_1, silu_29, axis=1);
+    # Conv (onnx)
+    conv2d_30 = Conv(cat_6, model.12.cv2.conv.weight, model.12.cv2.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Sigmoid (onnx)
+    val_43 = Sigmoid(conv2d_30);
+    # Mul (onnx)
+    silu_30 = Mul(conv2d_30, val_43);
+    # Resize (onnx)
+    upsample_nearest2d_1 = Resize(silu_30, val_47, mode="nearest", cubic_coeff_a=-0.75, coordinate_transformation_mode="asymmetric", exclude_outside=0, nearest_mode="floor", antialias=0, extrapolation_value=0, keep_aspect_ratio_policy="stretch");
+    # Concat (onnx)
+    cat_7 = Concat(upsample_nearest2d_1, silu_12, axis=1);
+    # Conv (onnx)
+    conv2d_31 = Conv(cat_7, model.15.cv1.conv.weight, model.15.cv1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Sigmoid (onnx)
+    val_48 = Sigmoid(conv2d_31);
+    # Mul (onnx)
+    silu_31 = Mul(conv2d_31, val_48);
+    # Split (onnx)
+    [split_with_sizes_16_split_0, split_with_sizes_16_split_1] = Split(silu_31, val_11, axis=1);
+    # Conv (onnx)
+    conv2d_32 = Conv(split_with_sizes_16_split_1, model.15.m.0.cv1.conv.weight, model.15.m.0.cv1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_49 = Sigmoid(conv2d_32);
+    # Mul (onnx)
+    silu_32 = Mul(conv2d_32, val_49);
+    # Conv (onnx)
+    conv2d_33 = Conv(silu_32, model.15.m.0.cv2.conv.weight, model.15.m.0.cv2.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_50 = Sigmoid(conv2d_33);
+    # Mul (onnx)
+    silu_33 = Mul(conv2d_33, val_50);
+    # Concat (onnx)
+    cat_8 = Concat(split_with_sizes_16_split_0, split_with_sizes_16_split_1, silu_33, axis=1);
+    # Conv (onnx)
+    conv2d_34 = Conv(cat_8, model.15.cv2.conv.weight, model.15.cv2.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Sigmoid (onnx)
+    val_51 = Sigmoid(conv2d_34);
+    # Mul (onnx)
+    silu_34 = Mul(conv2d_34, val_51);
+    # Conv (onnx)
+    conv2d_35 = Conv(silu_34, model.16.conv.weight, model.16.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[2, 2], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_52 = Sigmoid(conv2d_35);
+    # Mul (onnx)
+    silu_35 = Mul(conv2d_35, val_52);
+    # Concat (onnx)
+    cat_9 = Concat(silu_35, silu_30, axis=1);
+    # Conv (onnx)
+    conv2d_36 = Conv(cat_9, model.18.cv1.conv.weight, model.18.cv1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Sigmoid (onnx)
+    val_53 = Sigmoid(conv2d_36);
+    # Mul (onnx)
+    silu_36 = Mul(conv2d_36, val_53);
+    # Split (onnx)
+    [split_with_sizes_19_split_0, split_with_sizes_19_split_1] = Split(silu_36, val_19, axis=1);
+    # Conv (onnx)
+    conv2d_37 = Conv(split_with_sizes_19_split_1, model.18.m.0.cv1.conv.weight, model.18.m.0.cv1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_54 = Sigmoid(conv2d_37);
+    # Mul (onnx)
+    silu_37 = Mul(conv2d_37, val_54);
+    # Conv (onnx)
+    conv2d_38 = Conv(silu_37, model.18.m.0.cv2.conv.weight, model.18.m.0.cv2.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_55 = Sigmoid(conv2d_38);
+    # Mul (onnx)
+    silu_38 = Mul(conv2d_38, val_55);
+    # Concat (onnx)
+    cat_10 = Concat(split_with_sizes_19_split_0, split_with_sizes_19_split_1, silu_38, axis=1);
+    # Conv (onnx)
+    conv2d_39 = Conv(cat_10, model.18.cv2.conv.weight, model.18.cv2.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Sigmoid (onnx)
+    val_56 = Sigmoid(conv2d_39);
+    # Mul (onnx)
+    silu_39 = Mul(conv2d_39, val_56);
+    # Conv (onnx)
+    conv2d_40 = Conv(silu_39, model.19.conv.weight, model.19.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[2, 2], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_57 = Sigmoid(conv2d_40);
+    # Mul (onnx)
+    silu_40 = Mul(conv2d_40, val_57);
+    # Concat (onnx)
+    cat_11 = Concat(silu_40, silu_26, axis=1);
+    # Conv (onnx)
+    conv2d_41 = Conv(cat_11, model.21.cv1.conv.weight, model.21.cv1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Sigmoid (onnx)
+    val_58 = Sigmoid(conv2d_41);
+    # Mul (onnx)
+    silu_41 = Mul(conv2d_41, val_58);
+    # Split (onnx)
+    [split_with_sizes_22_split_0, split_with_sizes_22_split_1] = Split(silu_41, val_27, axis=1);
+    # Conv (onnx)
+    conv2d_42 = Conv(split_with_sizes_22_split_1, model.21.m.0.cv1.conv.weight, model.21.m.0.cv1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_59 = Sigmoid(conv2d_42);
+    # Mul (onnx)
+    silu_42 = Mul(conv2d_42, val_59);
+    # Conv (onnx)
+    conv2d_43 = Conv(silu_42, model.21.m.0.cv2.conv.weight, model.21.m.0.cv2.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_60 = Sigmoid(conv2d_43);
+    # Mul (onnx)
+    silu_43 = Mul(conv2d_43, val_60);
+    # Concat (onnx)
+    cat_12 = Concat(split_with_sizes_22_split_0, split_with_sizes_22_split_1, silu_43, axis=1);
+    # Conv (onnx)
+    conv2d_44 = Conv(cat_12, model.21.cv2.conv.weight, model.21.cv2.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Sigmoid (onnx)
+    val_61 = Sigmoid(conv2d_44);
+    # Mul (onnx)
+    silu_44 = Mul(conv2d_44, val_61);
+    # Conv (onnx)
+    conv2d_45 = Conv(silu_34, model.22.cv2.0.0.conv.weight, model.22.cv2.0.0.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_62 = Sigmoid(conv2d_45);
+    # Mul (onnx)
+    silu_45 = Mul(conv2d_45, val_62);
+    # Conv (onnx)
+    conv2d_46 = Conv(silu_45, model.22.cv2.0.1.conv.weight, model.22.cv2.0.1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_63 = Sigmoid(conv2d_46);
+    # Mul (onnx)
+    silu_46 = Mul(conv2d_46, val_63);
+    # Conv (onnx)
+    conv2d_47 = Conv(silu_46, model.22.cv2.0.2.weight, model.22.cv2.0.2.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Conv (onnx)
+    conv2d_48 = Conv(silu_34, model.22.cv3.0.0.conv.weight, model.22.cv3.0.0.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_64 = Sigmoid(conv2d_48);
+    # Mul (onnx)
+    silu_47 = Mul(conv2d_48, val_64);
+    # Conv (onnx)
+    conv2d_49 = Conv(silu_47, model.22.cv3.0.1.conv.weight, model.22.cv3.0.1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_65 = Sigmoid(conv2d_49);
+    # Mul (onnx)
+    silu_48 = Mul(conv2d_49, val_65);
+    # Conv (onnx)
+    conv2d_50 = Conv(silu_48, model.22.cv3.0.2.weight, model.22.cv3.0.2.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Conv (onnx)
+    conv2d_51 = Conv(silu_39, model.22.cv2.1.0.conv.weight, model.22.cv2.1.0.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_66 = Sigmoid(conv2d_51);
+    # Mul (onnx)
+    silu_49 = Mul(conv2d_51, val_66);
+    # Conv (onnx)
+    conv2d_52 = Conv(silu_49, model.22.cv2.1.1.conv.weight, model.22.cv2.1.1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_67 = Sigmoid(conv2d_52);
+    # Mul (onnx)
+    silu_50 = Mul(conv2d_52, val_67);
+    # Conv (onnx)
+    conv2d_53 = Conv(silu_50, model.22.cv2.1.2.weight, model.22.cv2.1.2.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Conv (onnx)
+    conv2d_54 = Conv(silu_39, model.22.cv3.1.0.conv.weight, model.22.cv3.1.0.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_68 = Sigmoid(conv2d_54);
+    # Mul (onnx)
+    silu_51 = Mul(conv2d_54, val_68);
+    # Conv (onnx)
+    conv2d_55 = Conv(silu_51, model.22.cv3.1.1.conv.weight, model.22.cv3.1.1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_69 = Sigmoid(conv2d_55);
+    # Mul (onnx)
+    silu_52 = Mul(conv2d_55, val_69);
+    # Conv (onnx)
+    conv2d_56 = Conv(silu_52, model.22.cv3.1.2.weight, model.22.cv3.1.2.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Conv (onnx)
+    conv2d_57 = Conv(silu_44, model.22.cv2.2.0.conv.weight, model.22.cv2.2.0.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_70 = Sigmoid(conv2d_57);
+    # Mul (onnx)
+    silu_53 = Mul(conv2d_57, val_70);
+    # Conv (onnx)
+    conv2d_58 = Conv(silu_53, model.22.cv2.2.1.conv.weight, model.22.cv2.2.1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_71 = Sigmoid(conv2d_58);
+    # Mul (onnx)
+    silu_54 = Mul(conv2d_58, val_71);
+    # Conv (onnx)
+    conv2d_59 = Conv(silu_54, model.22.cv2.2.2.weight, model.22.cv2.2.2.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Conv (onnx)
+    conv2d_60 = Conv(silu_44, model.22.cv3.2.0.conv.weight, model.22.cv3.2.0.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_72 = Sigmoid(conv2d_60);
+    # Mul (onnx)
+    silu_55 = Mul(conv2d_60, val_72);
+    # Conv (onnx)
+    conv2d_61 = Conv(silu_55, model.22.cv3.2.1.conv.weight, model.22.cv3.2.1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_73 = Sigmoid(conv2d_61);
+    # Mul (onnx)
+    silu_56 = Mul(conv2d_61, val_73);
+    # Conv (onnx)
+    conv2d_62 = Conv(silu_56, model.22.cv3.2.2.weight, model.22.cv3.2.2.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Conv (onnx)
+    conv2d_63 = Conv(silu_34, model.22.cv4.0.0.conv.weight, model.22.cv4.0.0.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_74 = Sigmoid(conv2d_63);
+    # Mul (onnx)
+    silu_57 = Mul(conv2d_63, val_74);
+    # Conv (onnx)
+    conv2d_64 = Conv(silu_57, model.22.cv4.0.1.conv.weight, model.22.cv4.0.1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_75 = Sigmoid(conv2d_64);
+    # Mul (onnx)
+    silu_58 = Mul(conv2d_64, val_75);
+    # Conv (onnx)
+    conv2d_65 = Conv(silu_58, model.22.cv4.0.2.weight, model.22.cv4.0.2.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Concat (onnx)
+    output0 = Concat(conv2d_47, conv2d_50, conv2d_65, axis=1);
+    # Conv (onnx)
+    conv2d_66 = Conv(silu_39, model.22.cv4.1.0.conv.weight, model.22.cv4.1.0.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_76 = Sigmoid(conv2d_66);
+    # Mul (onnx)
+    silu_59 = Mul(conv2d_66, val_76);
+    # Conv (onnx)
+    conv2d_67 = Conv(silu_59, model.22.cv4.1.1.conv.weight, model.22.cv4.1.1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_77 = Sigmoid(conv2d_67);
+    # Mul (onnx)
+    silu_60 = Mul(conv2d_67, val_77);
+    # Conv (onnx)
+    conv2d_68 = Conv(silu_60, model.22.cv4.1.2.weight, model.22.cv4.1.2.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Concat (onnx)
+    cat_17 = Concat(conv2d_53, conv2d_56, conv2d_68, axis=1);
+    # Conv (onnx)
+    conv2d_69 = Conv(silu_44, model.22.cv4.2.0.conv.weight, model.22.cv4.2.0.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_78 = Sigmoid(conv2d_69);
+    # Mul (onnx)
+    silu_61 = Mul(conv2d_69, val_78);
+    # Conv (onnx)
+    conv2d_70 = Conv(silu_61, model.22.cv4.2.1.conv.weight, model.22.cv4.2.1.conv.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[1, 1, 1, 1]);
+    # Sigmoid (onnx)
+    val_79 = Sigmoid(conv2d_70);
+    # Mul (onnx)
+    silu_62 = Mul(conv2d_70, val_79);
+    # Conv (onnx)
+    conv2d_71 = Conv(silu_62, model.22.cv4.2.2.weight, model.22.cv4.2.2.bias, group=1, auto_pad="NOTSET", dilations=[1, 1], strides=[1, 1], pads=[0, 0, 0, 0]);
+    # Concat (onnx)
+    cat_18 = Concat(conv2d_59, conv2d_62, conv2d_71, axis=1);
+  }
+
+  outputs { output0, cat_17, cat_18; }
+}

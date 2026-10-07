@@ -1,0 +1,313 @@
+webnn_graph "face_landmark" v1 {
+  inputs {
+    input_1: f32[1, 192, 192, 3];
+  }
+
+  consts {
+    pad_const__611: i64[8] @weights("pad_const__611");
+    pad_const__584: i64[8] @weights("pad_const__584");
+    pad_const__557: i64[8] @weights("pad_const__557");
+    new_shape__899: i64[4] @weights("new_shape__899");
+    new_shape__897: i64[4] @weights("new_shape__897");
+    depthwise_conv2d_6/Bias: f32[64] @weights("depthwise_conv2d_6/Bias");
+    depthwise_conv2d_3/Bias: f32[32] @weights("depthwise_conv2d_3/Bias");
+    depthwise_conv2d_22/Bias: f32[128] @weights("depthwise_conv2d_22/Bias");
+    depthwise_conv2d_1/Bias: f32[16] @weights("depthwise_conv2d_1/Bias");
+    conv2d_9/Bias: f32[128] @weights("conv2d_9/Bias");
+    conv2d_8/Bias: f32[64] @weights("conv2d_8/Bias");
+    conv2d_7/Bias: f32[64] @weights("conv2d_7/Bias");
+    conv2d_6/Bias: f32[64] @weights("conv2d_6/Bias");
+    conv2d_5/Bias: f32[32] @weights("conv2d_5/Bias");
+    conv2d_4/Bias: f32[32] @weights("conv2d_4/Bias");
+    conv2d_30/Bias: f32[1] @weights("conv2d_30/Bias");
+    conv2d_3/Bias: f32[32] @weights("conv2d_3/Bias");
+    conv2d_29/Bias: f32[32] @weights("conv2d_29/Bias");
+    conv2d_28/Bias: f32[32] @weights("conv2d_28/Bias");
+    conv2d_27/Bias: f32[128] @weights("conv2d_27/Bias");
+    conv2d_20/Bias: f32[1404] @weights("conv2d_20/Bias");
+    conv2d_2/Bias: f32[16] @weights("conv2d_2/Bias");
+    conv2d_19/Bias: f32[32] @weights("conv2d_19/Bias");
+    conv2d_18/Bias: f32[32] @weights("conv2d_18/Bias");
+    conv2d_17/Bias: f32[128] @weights("conv2d_17/Bias");
+    conv2d_16/Bias: f32[128] @weights("conv2d_16/Bias");
+    conv2d_15/Bias: f32[128] @weights("conv2d_15/Bias");
+    conv2d_14/Bias: f32[128] @weights("conv2d_14/Bias");
+    conv2d_13/Bias: f32[128] @weights("conv2d_13/Bias");
+    conv2d_12/Bias: f32[128] @weights("conv2d_12/Bias");
+    conv2d_11/Bias: f32[128] @weights("conv2d_11/Bias");
+    conv2d_10/Bias: f32[128] @weights("conv2d_10/Bias");
+    conv2d_1/Bias: f32[16] @weights("conv2d_1/Bias");
+    conv2d/Bias: f32[16] @weights("conv2d/Bias");
+    const_fold_opt__999: f32[32, 32, 1, 1] @weights("const_fold_opt__999");
+    const_fold_opt__997: f32[32, 32, 1, 1] @weights("const_fold_opt__997");
+    const_fold_opt__996: f32[32, 128, 1, 1] @weights("const_fold_opt__996");
+    const_fold_opt__995: f32[32, 1, 3, 3] @weights("const_fold_opt__995");
+    const_fold_opt__992: f32[1, 64, 1, 1] @weights("const_fold_opt__992");
+    const_fold_opt__991: f32[1, 32, 1, 1] @weights("const_fold_opt__991");
+    const_fold_opt__989: f32[32, 128, 1, 1] @weights("const_fold_opt__989");
+    const_fold_opt__984: f32[128, 1, 3, 3] @weights("const_fold_opt__984");
+    const_fold_opt__976: f32[1, 64, 1, 1] @weights("const_fold_opt__976");
+    const_fold_opt__975: f32[1, 32, 1, 1] @weights("const_fold_opt__975");
+    const_fold_opt__971: f32[16, 16, 1, 1] @weights("const_fold_opt__971");
+    const_fold_opt__961: f32[1, 32, 1, 1] @weights("const_fold_opt__961");
+    const_fold_opt__957: f32[128, 128, 1, 1] @weights("const_fold_opt__957");
+    const_fold_opt__954: f32[32, 32, 1, 1] @weights("const_fold_opt__954");
+    const_fold_opt__946: f32[1, 64, 1, 1] @weights("const_fold_opt__946");
+    const_fold_opt__1084: f32[1, 32, 1, 1] @weights("const_fold_opt__1084");
+    const_fold_opt__1083: f32[16, 1, 3, 3] @weights("const_fold_opt__1083");
+    const_fold_opt__1081: f32[32, 32, 1, 1] @weights("const_fold_opt__1081");
+    const_fold_opt__1080: f32[128, 1, 3, 3] @weights("const_fold_opt__1080");
+    const_fold_opt__1078: f32[64, 1, 3, 3] @weights("const_fold_opt__1078");
+    const_fold_opt__1077: f32[128, 1, 3, 3] @weights("const_fold_opt__1077");
+    const_fold_opt__1076: f32[16, 3, 3, 3] @weights("const_fold_opt__1076");
+    const_fold_opt__1073: f32[128, 1, 3, 3] @weights("const_fold_opt__1073");
+    const_fold_opt__1072: f32[16, 1, 3, 3] @weights("const_fold_opt__1072");
+    const_fold_opt__1071: f32[1, 128, 1, 1] @weights("const_fold_opt__1071");
+    const_fold_opt__1070: f32[16, 16, 1, 1] @weights("const_fold_opt__1070");
+    const_fold_opt__1069: f32[128, 1, 3, 3] @weights("const_fold_opt__1069");
+    const_fold_opt__1068: f32[1, 128, 1, 1] @weights("const_fold_opt__1068");
+    const_fold_opt__1067: f32[32, 16, 1, 1] @weights("const_fold_opt__1067");
+    const_fold_opt__1066: f32[32, 1, 3, 3] @weights("const_fold_opt__1066");
+    const_fold_opt__1065: f32[32, 1, 3, 3] @weights("const_fold_opt__1065");
+    const_fold_opt__1064: f32[1, 128, 1, 1] @weights("const_fold_opt__1064");
+    const_fold_opt__1063: f32[32, 1, 3, 3] @weights("const_fold_opt__1063");
+    const_fold_opt__1061: f32[1404, 32, 3, 3] @weights("const_fold_opt__1061");
+    const_fold_opt__1058: f32[1, 32, 1, 1] @weights("const_fold_opt__1058");
+    const_fold_opt__1056: f32[16, 1, 3, 3] @weights("const_fold_opt__1056");
+    const_fold_opt__1055: f32[1, 16, 1, 1] @weights("const_fold_opt__1055");
+    const_fold_opt__1054: f32[128, 64, 1, 1] @weights("const_fold_opt__1054");
+    const_fold_opt__1052: f32[128, 1, 3, 3] @weights("const_fold_opt__1052");
+    const_fold_opt__1051: f32[128, 128, 1, 1] @weights("const_fold_opt__1051");
+    const_fold_opt__1050: f32[128, 128, 1, 1] @weights("const_fold_opt__1050");
+    const_fold_opt__1045: f32[1, 32, 1, 1] @weights("const_fold_opt__1045");
+    const_fold_opt__1044: f32[1, 128, 1, 1] @weights("const_fold_opt__1044");
+    const_fold_opt__1043: f32[1, 32, 3, 3] @weights("const_fold_opt__1043");
+    const_fold_opt__1039: f32[128, 128, 1, 1] @weights("const_fold_opt__1039");
+    const_fold_opt__1038: f32[1, 128, 1, 1] @weights("const_fold_opt__1038");
+    const_fold_opt__1036: f32[128, 1, 3, 3] @weights("const_fold_opt__1036");
+    const_fold_opt__1035: f32[32, 1, 3, 3] @weights("const_fold_opt__1035");
+    const_fold_opt__1033: f32[64, 32, 1, 1] @weights("const_fold_opt__1033");
+    const_fold_opt__1032: f32[64, 1, 3, 3] @weights("const_fold_opt__1032");
+    const_fold_opt__1031: f32[64, 64, 1, 1] @weights("const_fold_opt__1031");
+    const_fold_opt__1030: f32[1, 16, 1, 1] @weights("const_fold_opt__1030");
+    const_fold_opt__1029: f32[1, 16, 1, 1] @weights("const_fold_opt__1029");
+    const_fold_opt__1028: f32[128, 1, 3, 3] @weights("const_fold_opt__1028");
+    const_fold_opt__1027: f32[128, 128, 1, 1] @weights("const_fold_opt__1027");
+    const_fold_opt__1023: f32[128, 128, 1, 1] @weights("const_fold_opt__1023");
+    const_fold_opt__1022: f32[1, 128, 1, 1] @weights("const_fold_opt__1022");
+    const_fold_opt__1020: f32[1, 128, 1, 1] @weights("const_fold_opt__1020");
+    const_fold_opt__1019: f32[128, 128, 1, 1] @weights("const_fold_opt__1019");
+    const_fold_opt__1017: f32[64, 64, 1, 1] @weights("const_fold_opt__1017");
+    const_fold_opt__1014: f32[1, 128, 1, 1] @weights("const_fold_opt__1014");
+    const_fold_opt__1013: f32[1, 32, 1, 1] @weights("const_fold_opt__1013");
+    const_fold_opt__1011: f32[1, 128, 1, 1] @weights("const_fold_opt__1011");
+    const_fold_opt__1010: f32[128, 128, 1, 1] @weights("const_fold_opt__1010");
+    const_fold_opt__1008: f32[1, 128, 1, 1] @weights("const_fold_opt__1008");
+    const_fold_opt__1006: f32[128, 128, 1, 1] @weights("const_fold_opt__1006");
+    const_fold_opt__1001: f32[128, 1, 3, 3] @weights("const_fold_opt__1001");
+    const_fold_opt__1000: f32[64, 1, 3, 3] @weights("const_fold_opt__1000");
+  }
+
+  nodes {
+    # Transpose (onnx)
+    conv2d__536_0 = Transpose(input_1, perm=[0, 3, 1, 2]);
+    # Conv (onnx)
+    conv2d = Conv(conv2d__536_0, const_fold_opt__1076, conv2d/Bias, strides=[2, 2], dilations=[1, 1], kernel_shape=[3, 3], pads=[0, 0, 1, 1], group=1);
+    # PRelu (onnx)
+    p_re_lu = PRelu(conv2d, const_fold_opt__1030);
+    # Conv (onnx)
+    depthwise_conv2d = Conv(p_re_lu, const_fold_opt__1056, depthwise_conv2d_1/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[3, 3], group=16, pads=[1, 1, 1, 1]);
+    # Conv (onnx)
+    conv2d_1 = Conv(depthwise_conv2d, const_fold_opt__1070, conv2d_1/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[1, 1], group=1);
+    # Add (onnx)
+    add = Add(p_re_lu, conv2d_1);
+    # PRelu (onnx)
+    p_re_lu_1 = PRelu(add, const_fold_opt__1055);
+    # Conv (onnx)
+    depthwise_conv2d_1 = Conv(p_re_lu_1, const_fold_opt__1083, depthwise_conv2d_1/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[3, 3], group=16, pads=[1, 1, 1, 1]);
+    # Conv (onnx)
+    conv2d_2 = Conv(depthwise_conv2d_1, const_fold_opt__971, conv2d_2/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[1, 1], group=1);
+    # Add (onnx)
+    add_1 = Add(p_re_lu_1, conv2d_2);
+    # PRelu (onnx)
+    p_re_lu_2 = PRelu(add_1, const_fold_opt__1029);
+    # MaxPool (onnx)
+    max_pooling2d = MaxPool(p_re_lu_2, strides=[2, 2], kernel_shape=[2, 2]);
+    # Pad (onnx)
+    channel_padding = Pad(max_pooling2d, pad_const__557);
+    # Conv (onnx)
+    depthwise_conv2d_2 = Conv(p_re_lu_2, const_fold_opt__1072, depthwise_conv2d_1/Bias, strides=[2, 2], dilations=[1, 1], kernel_shape=[3, 3], group=16, pads=[0, 0, 1, 1]);
+    # Conv (onnx)
+    conv2d_3 = Conv(depthwise_conv2d_2, const_fold_opt__1067, conv2d_3/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[1, 1], group=1);
+    # Add (onnx)
+    add_2 = Add(channel_padding, conv2d_3);
+    # PRelu (onnx)
+    p_re_lu_3 = PRelu(add_2, const_fold_opt__1058);
+    # Conv (onnx)
+    depthwise_conv2d_3 = Conv(p_re_lu_3, const_fold_opt__1035, depthwise_conv2d_3/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[3, 3], group=32, pads=[1, 1, 1, 1]);
+    # Conv (onnx)
+    conv2d_4 = Conv(depthwise_conv2d_3, const_fold_opt__997, conv2d_4/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[1, 1], group=1);
+    # Add (onnx)
+    add_3 = Add(p_re_lu_3, conv2d_4);
+    # PRelu (onnx)
+    p_re_lu_4 = PRelu(add_3, const_fold_opt__991);
+    # Conv (onnx)
+    depthwise_conv2d_4 = Conv(p_re_lu_4, const_fold_opt__995, depthwise_conv2d_3/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[3, 3], group=32, pads=[1, 1, 1, 1]);
+    # Conv (onnx)
+    conv2d_5 = Conv(depthwise_conv2d_4, const_fold_opt__954, conv2d_5/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[1, 1], group=1);
+    # Add (onnx)
+    add_4 = Add(p_re_lu_4, conv2d_5);
+    # PRelu (onnx)
+    p_re_lu_5 = PRelu(add_4, const_fold_opt__961);
+    # MaxPool (onnx)
+    max_pooling2d_1 = MaxPool(p_re_lu_5, strides=[2, 2], kernel_shape=[2, 2]);
+    # Pad (onnx)
+    channel_padding_1 = Pad(max_pooling2d_1, pad_const__584);
+    # Conv (onnx)
+    depthwise_conv2d_5 = Conv(p_re_lu_5, const_fold_opt__1065, depthwise_conv2d_3/Bias, strides=[2, 2], dilations=[1, 1], kernel_shape=[3, 3], group=32, pads=[0, 0, 1, 1]);
+    # Conv (onnx)
+    conv2d_6 = Conv(depthwise_conv2d_5, const_fold_opt__1033, conv2d_6/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[1, 1], group=1);
+    # Add (onnx)
+    add_5 = Add(channel_padding_1, conv2d_6);
+    # PRelu (onnx)
+    p_re_lu_6 = PRelu(add_5, const_fold_opt__946);
+    # Conv (onnx)
+    depthwise_conv2d_6 = Conv(p_re_lu_6, const_fold_opt__1032, depthwise_conv2d_6/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[3, 3], group=64, pads=[1, 1, 1, 1]);
+    # Conv (onnx)
+    conv2d_7 = Conv(depthwise_conv2d_6, const_fold_opt__1031, conv2d_7/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[1, 1], group=1);
+    # Add (onnx)
+    add_6 = Add(p_re_lu_6, conv2d_7);
+    # PRelu (onnx)
+    p_re_lu_7 = PRelu(add_6, const_fold_opt__976);
+    # Conv (onnx)
+    depthwise_conv2d_7 = Conv(p_re_lu_7, const_fold_opt__1078, depthwise_conv2d_6/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[3, 3], group=64, pads=[1, 1, 1, 1]);
+    # Conv (onnx)
+    conv2d_8 = Conv(depthwise_conv2d_7, const_fold_opt__1017, conv2d_8/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[1, 1], group=1);
+    # Add (onnx)
+    add_7 = Add(p_re_lu_7, conv2d_8);
+    # PRelu (onnx)
+    p_re_lu_8 = PRelu(add_7, const_fold_opt__992);
+    # MaxPool (onnx)
+    max_pooling2d_2 = MaxPool(p_re_lu_8, strides=[2, 2], kernel_shape=[2, 2]);
+    # Pad (onnx)
+    channel_padding_2 = Pad(max_pooling2d_2, pad_const__611);
+    # Conv (onnx)
+    depthwise_conv2d_8 = Conv(p_re_lu_8, const_fold_opt__1000, depthwise_conv2d_6/Bias, strides=[2, 2], dilations=[1, 1], kernel_shape=[3, 3], group=64, pads=[0, 0, 1, 1]);
+    # Conv (onnx)
+    conv2d_9 = Conv(depthwise_conv2d_8, const_fold_opt__1054, conv2d_9/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[1, 1], group=1);
+    # Add (onnx)
+    add_8 = Add(channel_padding_2, conv2d_9);
+    # PRelu (onnx)
+    p_re_lu_9 = PRelu(add_8, const_fold_opt__1044);
+    # Conv (onnx)
+    depthwise_conv2d_9 = Conv(p_re_lu_9, const_fold_opt__1036, depthwise_conv2d_22/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[3, 3], group=128, pads=[1, 1, 1, 1]);
+    # Conv (onnx)
+    conv2d_10 = Conv(depthwise_conv2d_9, const_fold_opt__1006, conv2d_10/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[1, 1], group=1);
+    # Add (onnx)
+    add_9 = Add(p_re_lu_9, conv2d_10);
+    # PRelu (onnx)
+    p_re_lu_10 = PRelu(add_9, const_fold_opt__1064);
+    # Conv (onnx)
+    depthwise_conv2d_10 = Conv(p_re_lu_10, const_fold_opt__1052, depthwise_conv2d_22/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[3, 3], group=128, pads=[1, 1, 1, 1]);
+    # Conv (onnx)
+    conv2d_11 = Conv(depthwise_conv2d_10, const_fold_opt__1010, conv2d_11/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[1, 1], group=1);
+    # Add (onnx)
+    add_10 = Add(p_re_lu_10, conv2d_11);
+    # PRelu (onnx)
+    p_re_lu_11 = PRelu(add_10, const_fold_opt__1011);
+    # MaxPool (onnx)
+    max_pooling2d_3 = MaxPool(p_re_lu_11, strides=[2, 2], kernel_shape=[2, 2]);
+    # Conv (onnx)
+    depthwise_conv2d_11 = Conv(p_re_lu_11, const_fold_opt__1028, depthwise_conv2d_22/Bias, strides=[2, 2], dilations=[1, 1], kernel_shape=[3, 3], group=128, pads=[0, 0, 1, 1]);
+    # Conv (onnx)
+    conv2d_12 = Conv(depthwise_conv2d_11, const_fold_opt__1050, conv2d_12/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[1, 1], group=1);
+    # Add (onnx)
+    add_11 = Add(max_pooling2d_3, conv2d_12);
+    # PRelu (onnx)
+    p_re_lu_12 = PRelu(add_11, const_fold_opt__1068);
+    # Conv (onnx)
+    depthwise_conv2d_12 = Conv(p_re_lu_12, const_fold_opt__1077, depthwise_conv2d_22/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[3, 3], group=128, pads=[1, 1, 1, 1]);
+    # Conv (onnx)
+    conv2d_13 = Conv(depthwise_conv2d_12, const_fold_opt__1019, conv2d_13/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[1, 1], group=1);
+    # Add (onnx)
+    add_12 = Add(p_re_lu_12, conv2d_13);
+    # PRelu (onnx)
+    p_re_lu_13 = PRelu(add_12, const_fold_opt__1008);
+    # Conv (onnx)
+    depthwise_conv2d_13 = Conv(p_re_lu_13, const_fold_opt__984, depthwise_conv2d_22/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[3, 3], group=128, pads=[1, 1, 1, 1]);
+    # Conv (onnx)
+    conv2d_14 = Conv(depthwise_conv2d_13, const_fold_opt__1051, conv2d_14/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[1, 1], group=1);
+    # Add (onnx)
+    add_13 = Add(p_re_lu_13, conv2d_14);
+    # PRelu (onnx)
+    p_re_lu_14 = PRelu(add_13, const_fold_opt__1022);
+    # MaxPool (onnx)
+    max_pooling2d_6 = MaxPool(p_re_lu_14, strides=[2, 2], kernel_shape=[2, 2]);
+    # Conv (onnx)
+    depthwise_conv2d_22 = Conv(p_re_lu_14, const_fold_opt__1001, depthwise_conv2d_22/Bias, strides=[2, 2], dilations=[1, 1], kernel_shape=[3, 3], group=128, pads=[0, 0, 1, 1]);
+    # Conv (onnx)
+    conv2d_27 = Conv(depthwise_conv2d_22, const_fold_opt__1023, conv2d_27/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[1, 1], group=1);
+    # Add (onnx)
+    add_22 = Add(max_pooling2d_6, conv2d_27);
+    # PRelu (onnx)
+    p_re_lu_25 = PRelu(add_22, const_fold_opt__1071);
+    # Conv (onnx)
+    conv2d_28 = Conv(p_re_lu_25, const_fold_opt__996, conv2d_28/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[1, 1], group=1);
+    # PRelu (onnx)
+    p_re_lu_26 = PRelu(conv2d_28, const_fold_opt__1013);
+    # Conv (onnx)
+    depthwise_conv2d_23 = Conv(p_re_lu_26, const_fold_opt__1063, depthwise_conv2d_3/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[3, 3], group=32, pads=[1, 1, 1, 1]);
+    # Conv (onnx)
+    conv2d_29 = Conv(depthwise_conv2d_23, const_fold_opt__1081, conv2d_29/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[1, 1], group=1);
+    # Add (onnx)
+    add_23 = Add(p_re_lu_26, conv2d_29);
+    # PRelu (onnx)
+    p_re_lu_27 = PRelu(add_23, const_fold_opt__1084);
+    # Conv (onnx)
+    conv2d_30_raw_output___489_0 = Conv(p_re_lu_27, const_fold_opt__1043, conv2d_30/Bias, strides=[3, 3], dilations=[1, 1], kernel_shape=[3, 3], group=1);
+    # Reshape (onnx)
+    conv2d_30 = Reshape(conv2d_30_raw_output___489_0, new_shape__897);
+    # Conv (onnx)
+    depthwise_conv2d_14 = Conv(p_re_lu_14, const_fold_opt__1069, depthwise_conv2d_22/Bias, strides=[2, 2], dilations=[1, 1], kernel_shape=[3, 3], group=128, pads=[0, 0, 1, 1]);
+    # Conv (onnx)
+    conv2d_15 = Conv(depthwise_conv2d_14, const_fold_opt__1027, conv2d_15/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[1, 1], group=1);
+    # Add (onnx)
+    add_14 = Add(max_pooling2d_6, conv2d_15);
+    # PRelu (onnx)
+    p_re_lu_15 = PRelu(add_14, const_fold_opt__1020);
+    # Conv (onnx)
+    depthwise_conv2d_15 = Conv(p_re_lu_15, const_fold_opt__1080, depthwise_conv2d_22/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[3, 3], group=128, pads=[1, 1, 1, 1]);
+    # Conv (onnx)
+    conv2d_16 = Conv(depthwise_conv2d_15, const_fold_opt__1039, conv2d_16/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[1, 1], group=1);
+    # Add (onnx)
+    add_15 = Add(p_re_lu_15, conv2d_16);
+    # PRelu (onnx)
+    p_re_lu_16 = PRelu(add_15, const_fold_opt__1014);
+    # Conv (onnx)
+    depthwise_conv2d_16 = Conv(p_re_lu_16, const_fold_opt__1073, depthwise_conv2d_22/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[3, 3], group=128, pads=[1, 1, 1, 1]);
+    # Conv (onnx)
+    conv2d_17 = Conv(depthwise_conv2d_16, const_fold_opt__957, conv2d_17/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[1, 1], group=1);
+    # Add (onnx)
+    add_16 = Add(p_re_lu_16, conv2d_17);
+    # PRelu (onnx)
+    p_re_lu_17 = PRelu(add_16, const_fold_opt__1038);
+    # Conv (onnx)
+    conv2d_18 = Conv(p_re_lu_17, const_fold_opt__989, conv2d_18/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[1, 1], group=1);
+    # PRelu (onnx)
+    p_re_lu_18 = PRelu(conv2d_18, const_fold_opt__1045);
+    # Conv (onnx)
+    depthwise_conv2d_17 = Conv(p_re_lu_18, const_fold_opt__1066, depthwise_conv2d_3/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[3, 3], group=32, pads=[1, 1, 1, 1]);
+    # Conv (onnx)
+    conv2d_19 = Conv(depthwise_conv2d_17, const_fold_opt__999, conv2d_19/Bias, strides=[1, 1], dilations=[1, 1], kernel_shape=[1, 1], group=1);
+    # Add (onnx)
+    add_17 = Add(p_re_lu_18, conv2d_19);
+    # PRelu (onnx)
+    p_re_lu_19 = PRelu(add_17, const_fold_opt__975);
+    # Conv (onnx)
+    conv2d_20_raw_output___487_0 = Conv(p_re_lu_19, const_fold_opt__1061, conv2d_20/Bias, strides=[3, 3], dilations=[1, 1], kernel_shape=[3, 3], group=1);
+    # Reshape (onnx)
+    conv2d_20 = Reshape(conv2d_20_raw_output___487_0, new_shape__899);
+  }
+
+  outputs { conv2d_20, conv2d_30; }
+}

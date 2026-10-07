@@ -1,0 +1,1027 @@
+{
+  "format": "wg-weights-manifest",
+  "version": 1,
+  "endianness": "little",
+  "tensors": {
+    "pad_const__611": {
+      "dataType": "int64",
+      "shape": [
+        8
+      ],
+      "byteOffset": 8,
+      "byteLength": 64
+    },
+    "pad_const__584": {
+      "dataType": "int64",
+      "shape": [
+        8
+      ],
+      "byteOffset": 72,
+      "byteLength": 64
+    },
+    "pad_const__557": {
+      "dataType": "int64",
+      "shape": [
+        8
+      ],
+      "byteOffset": 136,
+      "byteLength": 64
+    },
+    "new_shape__899": {
+      "dataType": "int64",
+      "shape": [
+        4
+      ],
+      "byteOffset": 200,
+      "byteLength": 32
+    },
+    "new_shape__897": {
+      "dataType": "int64",
+      "shape": [
+        4
+      ],
+      "byteOffset": 232,
+      "byteLength": 32
+    },
+    "depthwise_conv2d_6/Bias": {
+      "dataType": "float32",
+      "shape": [
+        64
+      ],
+      "byteOffset": 264,
+      "byteLength": 256
+    },
+    "depthwise_conv2d_3/Bias": {
+      "dataType": "float32",
+      "shape": [
+        32
+      ],
+      "byteOffset": 520,
+      "byteLength": 128
+    },
+    "depthwise_conv2d_22/Bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 648,
+      "byteLength": 512
+    },
+    "depthwise_conv2d_1/Bias": {
+      "dataType": "float32",
+      "shape": [
+        16
+      ],
+      "byteOffset": 1160,
+      "byteLength": 64
+    },
+    "conv2d_9/Bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 1224,
+      "byteLength": 512
+    },
+    "conv2d_8/Bias": {
+      "dataType": "float32",
+      "shape": [
+        64
+      ],
+      "byteOffset": 1736,
+      "byteLength": 256
+    },
+    "conv2d_7/Bias": {
+      "dataType": "float32",
+      "shape": [
+        64
+      ],
+      "byteOffset": 1992,
+      "byteLength": 256
+    },
+    "conv2d_6/Bias": {
+      "dataType": "float32",
+      "shape": [
+        64
+      ],
+      "byteOffset": 2248,
+      "byteLength": 256
+    },
+    "conv2d_5/Bias": {
+      "dataType": "float32",
+      "shape": [
+        32
+      ],
+      "byteOffset": 2504,
+      "byteLength": 128
+    },
+    "conv2d_4/Bias": {
+      "dataType": "float32",
+      "shape": [
+        32
+      ],
+      "byteOffset": 2632,
+      "byteLength": 128
+    },
+    "conv2d_30/Bias": {
+      "dataType": "float32",
+      "shape": [
+        1
+      ],
+      "byteOffset": 2760,
+      "byteLength": 4
+    },
+    "conv2d_3/Bias": {
+      "dataType": "float32",
+      "shape": [
+        32
+      ],
+      "byteOffset": 2764,
+      "byteLength": 128
+    },
+    "conv2d_29/Bias": {
+      "dataType": "float32",
+      "shape": [
+        32
+      ],
+      "byteOffset": 2892,
+      "byteLength": 128
+    },
+    "conv2d_28/Bias": {
+      "dataType": "float32",
+      "shape": [
+        32
+      ],
+      "byteOffset": 3020,
+      "byteLength": 128
+    },
+    "conv2d_27/Bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 3148,
+      "byteLength": 512
+    },
+    "conv2d_20/Bias": {
+      "dataType": "float32",
+      "shape": [
+        1404
+      ],
+      "byteOffset": 3660,
+      "byteLength": 5616
+    },
+    "conv2d_2/Bias": {
+      "dataType": "float32",
+      "shape": [
+        16
+      ],
+      "byteOffset": 9276,
+      "byteLength": 64
+    },
+    "conv2d_19/Bias": {
+      "dataType": "float32",
+      "shape": [
+        32
+      ],
+      "byteOffset": 9340,
+      "byteLength": 128
+    },
+    "conv2d_18/Bias": {
+      "dataType": "float32",
+      "shape": [
+        32
+      ],
+      "byteOffset": 9468,
+      "byteLength": 128
+    },
+    "conv2d_17/Bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 9596,
+      "byteLength": 512
+    },
+    "conv2d_16/Bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 10108,
+      "byteLength": 512
+    },
+    "conv2d_15/Bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 10620,
+      "byteLength": 512
+    },
+    "conv2d_14/Bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 11132,
+      "byteLength": 512
+    },
+    "conv2d_13/Bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 11644,
+      "byteLength": 512
+    },
+    "conv2d_12/Bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 12156,
+      "byteLength": 512
+    },
+    "conv2d_11/Bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 12668,
+      "byteLength": 512
+    },
+    "conv2d_10/Bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 13180,
+      "byteLength": 512
+    },
+    "conv2d_1/Bias": {
+      "dataType": "float32",
+      "shape": [
+        16
+      ],
+      "byteOffset": 13692,
+      "byteLength": 64
+    },
+    "conv2d/Bias": {
+      "dataType": "float32",
+      "shape": [
+        16
+      ],
+      "byteOffset": 13756,
+      "byteLength": 64
+    },
+    "const_fold_opt__999": {
+      "dataType": "float32",
+      "shape": [
+        32,
+        32,
+        1,
+        1
+      ],
+      "byteOffset": 13820,
+      "byteLength": 4096
+    },
+    "const_fold_opt__997": {
+      "dataType": "float32",
+      "shape": [
+        32,
+        32,
+        1,
+        1
+      ],
+      "byteOffset": 17916,
+      "byteLength": 4096
+    },
+    "const_fold_opt__996": {
+      "dataType": "float32",
+      "shape": [
+        32,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 22012,
+      "byteLength": 16384
+    },
+    "const_fold_opt__995": {
+      "dataType": "float32",
+      "shape": [
+        32,
+        1,
+        3,
+        3
+      ],
+      "byteOffset": 38396,
+      "byteLength": 1152
+    },
+    "const_fold_opt__992": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        64,
+        1,
+        1
+      ],
+      "byteOffset": 39548,
+      "byteLength": 256
+    },
+    "const_fold_opt__991": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        32,
+        1,
+        1
+      ],
+      "byteOffset": 39804,
+      "byteLength": 128
+    },
+    "const_fold_opt__989": {
+      "dataType": "float32",
+      "shape": [
+        32,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 39932,
+      "byteLength": 16384
+    },
+    "const_fold_opt__984": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        1,
+        3,
+        3
+      ],
+      "byteOffset": 56316,
+      "byteLength": 4608
+    },
+    "const_fold_opt__976": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        64,
+        1,
+        1
+      ],
+      "byteOffset": 60924,
+      "byteLength": 256
+    },
+    "const_fold_opt__975": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        32,
+        1,
+        1
+      ],
+      "byteOffset": 61180,
+      "byteLength": 128
+    },
+    "const_fold_opt__971": {
+      "dataType": "float32",
+      "shape": [
+        16,
+        16,
+        1,
+        1
+      ],
+      "byteOffset": 61308,
+      "byteLength": 1024
+    },
+    "const_fold_opt__961": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        32,
+        1,
+        1
+      ],
+      "byteOffset": 62332,
+      "byteLength": 128
+    },
+    "const_fold_opt__957": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 62460,
+      "byteLength": 65536
+    },
+    "const_fold_opt__954": {
+      "dataType": "float32",
+      "shape": [
+        32,
+        32,
+        1,
+        1
+      ],
+      "byteOffset": 127996,
+      "byteLength": 4096
+    },
+    "const_fold_opt__946": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        64,
+        1,
+        1
+      ],
+      "byteOffset": 132092,
+      "byteLength": 256
+    },
+    "const_fold_opt__1084": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        32,
+        1,
+        1
+      ],
+      "byteOffset": 132348,
+      "byteLength": 128
+    },
+    "const_fold_opt__1083": {
+      "dataType": "float32",
+      "shape": [
+        16,
+        1,
+        3,
+        3
+      ],
+      "byteOffset": 132476,
+      "byteLength": 576
+    },
+    "const_fold_opt__1081": {
+      "dataType": "float32",
+      "shape": [
+        32,
+        32,
+        1,
+        1
+      ],
+      "byteOffset": 133052,
+      "byteLength": 4096
+    },
+    "const_fold_opt__1080": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        1,
+        3,
+        3
+      ],
+      "byteOffset": 137148,
+      "byteLength": 4608
+    },
+    "const_fold_opt__1078": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        1,
+        3,
+        3
+      ],
+      "byteOffset": 141756,
+      "byteLength": 2304
+    },
+    "const_fold_opt__1077": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        1,
+        3,
+        3
+      ],
+      "byteOffset": 144060,
+      "byteLength": 4608
+    },
+    "const_fold_opt__1076": {
+      "dataType": "float32",
+      "shape": [
+        16,
+        3,
+        3,
+        3
+      ],
+      "byteOffset": 148668,
+      "byteLength": 1728
+    },
+    "const_fold_opt__1073": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        1,
+        3,
+        3
+      ],
+      "byteOffset": 150396,
+      "byteLength": 4608
+    },
+    "const_fold_opt__1072": {
+      "dataType": "float32",
+      "shape": [
+        16,
+        1,
+        3,
+        3
+      ],
+      "byteOffset": 155004,
+      "byteLength": 576
+    },
+    "const_fold_opt__1071": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 155580,
+      "byteLength": 512
+    },
+    "const_fold_opt__1070": {
+      "dataType": "float32",
+      "shape": [
+        16,
+        16,
+        1,
+        1
+      ],
+      "byteOffset": 156092,
+      "byteLength": 1024
+    },
+    "const_fold_opt__1069": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        1,
+        3,
+        3
+      ],
+      "byteOffset": 157116,
+      "byteLength": 4608
+    },
+    "const_fold_opt__1068": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 161724,
+      "byteLength": 512
+    },
+    "const_fold_opt__1067": {
+      "dataType": "float32",
+      "shape": [
+        32,
+        16,
+        1,
+        1
+      ],
+      "byteOffset": 162236,
+      "byteLength": 2048
+    },
+    "const_fold_opt__1066": {
+      "dataType": "float32",
+      "shape": [
+        32,
+        1,
+        3,
+        3
+      ],
+      "byteOffset": 164284,
+      "byteLength": 1152
+    },
+    "const_fold_opt__1065": {
+      "dataType": "float32",
+      "shape": [
+        32,
+        1,
+        3,
+        3
+      ],
+      "byteOffset": 165436,
+      "byteLength": 1152
+    },
+    "const_fold_opt__1064": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 166588,
+      "byteLength": 512
+    },
+    "const_fold_opt__1063": {
+      "dataType": "float32",
+      "shape": [
+        32,
+        1,
+        3,
+        3
+      ],
+      "byteOffset": 167100,
+      "byteLength": 1152
+    },
+    "const_fold_opt__1061": {
+      "dataType": "float32",
+      "shape": [
+        1404,
+        32,
+        3,
+        3
+      ],
+      "byteOffset": 168252,
+      "byteLength": 1617408
+    },
+    "const_fold_opt__1058": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        32,
+        1,
+        1
+      ],
+      "byteOffset": 1785660,
+      "byteLength": 128
+    },
+    "const_fold_opt__1056": {
+      "dataType": "float32",
+      "shape": [
+        16,
+        1,
+        3,
+        3
+      ],
+      "byteOffset": 1785788,
+      "byteLength": 576
+    },
+    "const_fold_opt__1055": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ],
+      "byteOffset": 1786364,
+      "byteLength": 64
+    },
+    "const_fold_opt__1054": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        64,
+        1,
+        1
+      ],
+      "byteOffset": 1786428,
+      "byteLength": 32768
+    },
+    "const_fold_opt__1052": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        1,
+        3,
+        3
+      ],
+      "byteOffset": 1819196,
+      "byteLength": 4608
+    },
+    "const_fold_opt__1051": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 1823804,
+      "byteLength": 65536
+    },
+    "const_fold_opt__1050": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 1889340,
+      "byteLength": 65536
+    },
+    "const_fold_opt__1045": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        32,
+        1,
+        1
+      ],
+      "byteOffset": 1954876,
+      "byteLength": 128
+    },
+    "const_fold_opt__1044": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 1955004,
+      "byteLength": 512
+    },
+    "const_fold_opt__1043": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        32,
+        3,
+        3
+      ],
+      "byteOffset": 1955516,
+      "byteLength": 1152
+    },
+    "const_fold_opt__1039": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 1956668,
+      "byteLength": 65536
+    },
+    "const_fold_opt__1038": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 2022204,
+      "byteLength": 512
+    },
+    "const_fold_opt__1036": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        1,
+        3,
+        3
+      ],
+      "byteOffset": 2022716,
+      "byteLength": 4608
+    },
+    "const_fold_opt__1035": {
+      "dataType": "float32",
+      "shape": [
+        32,
+        1,
+        3,
+        3
+      ],
+      "byteOffset": 2027324,
+      "byteLength": 1152
+    },
+    "const_fold_opt__1033": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        32,
+        1,
+        1
+      ],
+      "byteOffset": 2028476,
+      "byteLength": 8192
+    },
+    "const_fold_opt__1032": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        1,
+        3,
+        3
+      ],
+      "byteOffset": 2036668,
+      "byteLength": 2304
+    },
+    "const_fold_opt__1031": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        64,
+        1,
+        1
+      ],
+      "byteOffset": 2038972,
+      "byteLength": 16384
+    },
+    "const_fold_opt__1030": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ],
+      "byteOffset": 2055356,
+      "byteLength": 64
+    },
+    "const_fold_opt__1029": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ],
+      "byteOffset": 2055420,
+      "byteLength": 64
+    },
+    "const_fold_opt__1028": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        1,
+        3,
+        3
+      ],
+      "byteOffset": 2055484,
+      "byteLength": 4608
+    },
+    "const_fold_opt__1027": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 2060092,
+      "byteLength": 65536
+    },
+    "const_fold_opt__1023": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 2125628,
+      "byteLength": 65536
+    },
+    "const_fold_opt__1022": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 2191164,
+      "byteLength": 512
+    },
+    "const_fold_opt__1020": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 2191676,
+      "byteLength": 512
+    },
+    "const_fold_opt__1019": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 2192188,
+      "byteLength": 65536
+    },
+    "const_fold_opt__1017": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        64,
+        1,
+        1
+      ],
+      "byteOffset": 2257724,
+      "byteLength": 16384
+    },
+    "const_fold_opt__1014": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 2274108,
+      "byteLength": 512
+    },
+    "const_fold_opt__1013": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        32,
+        1,
+        1
+      ],
+      "byteOffset": 2274620,
+      "byteLength": 128
+    },
+    "const_fold_opt__1011": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 2274748,
+      "byteLength": 512
+    },
+    "const_fold_opt__1010": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 2275260,
+      "byteLength": 65536
+    },
+    "const_fold_opt__1008": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 2340796,
+      "byteLength": 512
+    },
+    "const_fold_opt__1006": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 2341308,
+      "byteLength": 65536
+    },
+    "const_fold_opt__1001": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        1,
+        3,
+        3
+      ],
+      "byteOffset": 2406844,
+      "byteLength": 4608
+    },
+    "const_fold_opt__1000": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        1,
+        3,
+        3
+      ],
+      "byteOffset": 2411452,
+      "byteLength": 2304
+    }
+  }
+}

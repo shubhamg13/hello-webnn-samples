@@ -41,6 +41,14 @@ CPU / GPU / NPU device selector where supported.
 | Face Detector (raw) | BlazeFace SSD graph built directly with `MLGraphBuilder` | [`face_detector-webnn/`](face_detector-webnn/) |
 | Group Test | Subgraph decomposition of the first N operators (1–5 ops) | [`face_detector_group_test/`](face_detector_group_test/) |
 | Graph Explorer | Clickable graph nodes, per-node subgraph comparison across devices | [`graph_explorer/`](graph_explorer/) |
+| Face Detection v2 (SSD + YOLO) | Switchable SSD v1/v2 + YOLOv8n-Face backends + landmarks | [`webnn_face_detection_v2/`](webnn_face_detection_v2/) |
+| MediaPipe Face Detector | BlazeFace graph via `MLGraphBuilder` | [`mediapipe_face_detector-webnn/`](mediapipe_face_detector-webnn/) |
+| Face Landmark | 468-point landmark estimation | [`face_landmark-webnn/`](face_landmark-webnn/) |
+| Face Landmarks Detector | Detection + landmark pipeline | [`face_landmarks_detector-webnn/`](face_landmarks_detector-webnn/) |
+| YOLOv8n Face | YOLOv8n-face (640×640, DFL + 5 keypoints) | [`yolov8n-face-webnn/`](yolov8n-face-webnn/) |
+| YOLOv8s | YOLOv8s object detection | [`yolov8s-webnn/`](yolov8s-webnn/) |
+| YOLOv8s Detection | YOLOv8s detection demo | [`yolov8s_detection/`](yolov8s_detection/) |
+| Virtual Try-On | Realtime virtual makeup / lip try-on | [`virtual_tryon/`](virtual_tryon/) |
 
 ### TensorFlow.js / TFLite
 

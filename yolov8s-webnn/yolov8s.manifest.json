@@ -1,0 +1,1354 @@
+{
+  "format": "wg-weights-manifest",
+  "version": 1,
+  "endianness": "little",
+  "tensors": {
+    "model.0.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        32,
+        3,
+        3,
+        3
+      ],
+      "byteOffset": 8,
+      "byteLength": 3456
+    },
+    "model.0.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        32
+      ],
+      "byteOffset": 3464,
+      "byteLength": 128
+    },
+    "model.1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        32,
+        3,
+        3
+      ],
+      "byteOffset": 3592,
+      "byteLength": 73728
+    },
+    "model.1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        64
+      ],
+      "byteOffset": 77320,
+      "byteLength": 256
+    },
+    "model.2.cv1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        64,
+        1,
+        1
+      ],
+      "byteOffset": 77576,
+      "byteLength": 16384
+    },
+    "model.2.cv1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        64
+      ],
+      "byteOffset": 93960,
+      "byteLength": 256
+    },
+    "onnx::Split_137": {
+      "dataType": "int64",
+      "shape": [
+        2
+      ],
+      "byteOffset": 94216,
+      "byteLength": 16
+    },
+    "model.2.m.0.cv1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        32,
+        32,
+        3,
+        3
+      ],
+      "byteOffset": 94232,
+      "byteLength": 36864
+    },
+    "model.2.m.0.cv1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        32
+      ],
+      "byteOffset": 131096,
+      "byteLength": 128
+    },
+    "model.2.m.0.cv2.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        32,
+        32,
+        3,
+        3
+      ],
+      "byteOffset": 131224,
+      "byteLength": 36864
+    },
+    "model.2.m.0.cv2.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        32
+      ],
+      "byteOffset": 168088,
+      "byteLength": 128
+    },
+    "model.2.cv2.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        96,
+        1,
+        1
+      ],
+      "byteOffset": 168216,
+      "byteLength": 24576
+    },
+    "model.2.cv2.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        64
+      ],
+      "byteOffset": 192792,
+      "byteLength": 256
+    },
+    "model.3.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        64,
+        3,
+        3
+      ],
+      "byteOffset": 193048,
+      "byteLength": 294912
+    },
+    "model.3.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 487960,
+      "byteLength": 512
+    },
+    "model.4.cv1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 488472,
+      "byteLength": 65536
+    },
+    "model.4.cv1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 554008,
+      "byteLength": 512
+    },
+    "onnx::Split_157": {
+      "dataType": "int64",
+      "shape": [
+        2
+      ],
+      "byteOffset": 554520,
+      "byteLength": 16
+    },
+    "model.4.m.0.cv1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        64,
+        3,
+        3
+      ],
+      "byteOffset": 554536,
+      "byteLength": 147456
+    },
+    "model.4.m.0.cv1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        64
+      ],
+      "byteOffset": 701992,
+      "byteLength": 256
+    },
+    "model.4.m.0.cv2.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        64,
+        3,
+        3
+      ],
+      "byteOffset": 702248,
+      "byteLength": 147456
+    },
+    "model.4.m.0.cv2.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        64
+      ],
+      "byteOffset": 849704,
+      "byteLength": 256
+    },
+    "model.4.m.1.cv1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        64,
+        3,
+        3
+      ],
+      "byteOffset": 849960,
+      "byteLength": 147456
+    },
+    "model.4.m.1.cv1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        64
+      ],
+      "byteOffset": 997416,
+      "byteLength": 256
+    },
+    "model.4.m.1.cv2.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        64,
+        3,
+        3
+      ],
+      "byteOffset": 997672,
+      "byteLength": 147456
+    },
+    "model.4.m.1.cv2.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        64
+      ],
+      "byteOffset": 1145128,
+      "byteLength": 256
+    },
+    "model.4.cv2.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        256,
+        1,
+        1
+      ],
+      "byteOffset": 1145384,
+      "byteLength": 131072
+    },
+    "model.4.cv2.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 1276456,
+      "byteLength": 512
+    },
+    "model.5.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        256,
+        128,
+        3,
+        3
+      ],
+      "byteOffset": 1276968,
+      "byteLength": 1179648
+    },
+    "model.5.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        256
+      ],
+      "byteOffset": 2456616,
+      "byteLength": 1024
+    },
+    "model.6.cv1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        256,
+        256,
+        1,
+        1
+      ],
+      "byteOffset": 2457640,
+      "byteLength": 262144
+    },
+    "model.6.cv1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        256
+      ],
+      "byteOffset": 2719784,
+      "byteLength": 1024
+    },
+    "onnx::Split_184": {
+      "dataType": "int64",
+      "shape": [
+        2
+      ],
+      "byteOffset": 2720808,
+      "byteLength": 16
+    },
+    "model.6.m.0.cv1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        128,
+        3,
+        3
+      ],
+      "byteOffset": 2720824,
+      "byteLength": 589824
+    },
+    "model.6.m.0.cv1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 3310648,
+      "byteLength": 512
+    },
+    "model.6.m.0.cv2.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        128,
+        3,
+        3
+      ],
+      "byteOffset": 3311160,
+      "byteLength": 589824
+    },
+    "model.6.m.0.cv2.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 3900984,
+      "byteLength": 512
+    },
+    "model.6.m.1.cv1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        128,
+        3,
+        3
+      ],
+      "byteOffset": 3901496,
+      "byteLength": 589824
+    },
+    "model.6.m.1.cv1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 4491320,
+      "byteLength": 512
+    },
+    "model.6.m.1.cv2.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        128,
+        3,
+        3
+      ],
+      "byteOffset": 4491832,
+      "byteLength": 589824
+    },
+    "model.6.m.1.cv2.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 5081656,
+      "byteLength": 512
+    },
+    "model.6.cv2.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        256,
+        512,
+        1,
+        1
+      ],
+      "byteOffset": 5082168,
+      "byteLength": 524288
+    },
+    "model.6.cv2.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        256
+      ],
+      "byteOffset": 5606456,
+      "byteLength": 1024
+    },
+    "model.7.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        512,
+        256,
+        3,
+        3
+      ],
+      "byteOffset": 5607480,
+      "byteLength": 4718592
+    },
+    "model.7.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        512
+      ],
+      "byteOffset": 10326072,
+      "byteLength": 2048
+    },
+    "model.8.cv1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        512,
+        512,
+        1,
+        1
+      ],
+      "byteOffset": 10328120,
+      "byteLength": 1048576
+    },
+    "model.8.cv1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        512
+      ],
+      "byteOffset": 11376696,
+      "byteLength": 2048
+    },
+    "onnx::Split_211": {
+      "dataType": "int64",
+      "shape": [
+        2
+      ],
+      "byteOffset": 11378744,
+      "byteLength": 16
+    },
+    "model.8.m.0.cv1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        256,
+        256,
+        3,
+        3
+      ],
+      "byteOffset": 11378760,
+      "byteLength": 2359296
+    },
+    "model.8.m.0.cv1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        256
+      ],
+      "byteOffset": 13738056,
+      "byteLength": 1024
+    },
+    "model.8.m.0.cv2.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        256,
+        256,
+        3,
+        3
+      ],
+      "byteOffset": 13739080,
+      "byteLength": 2359296
+    },
+    "model.8.m.0.cv2.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        256
+      ],
+      "byteOffset": 16098376,
+      "byteLength": 1024
+    },
+    "model.8.cv2.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        512,
+        768,
+        1,
+        1
+      ],
+      "byteOffset": 16099400,
+      "byteLength": 1572864
+    },
+    "model.8.cv2.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        512
+      ],
+      "byteOffset": 17672264,
+      "byteLength": 2048
+    },
+    "model.9.cv1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        256,
+        512,
+        1,
+        1
+      ],
+      "byteOffset": 17674312,
+      "byteLength": 524288
+    },
+    "model.9.cv1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        256
+      ],
+      "byteOffset": 18198600,
+      "byteLength": 1024
+    },
+    "model.9.cv2.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        512,
+        1024,
+        1,
+        1
+      ],
+      "byteOffset": 18199624,
+      "byteLength": 2097152
+    },
+    "model.9.cv2.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        512
+      ],
+      "byteOffset": 20296776,
+      "byteLength": 2048
+    },
+    "/model.10/Constant_output_0": {
+      "dataType": "float32",
+      "shape": [
+        4
+      ],
+      "byteOffset": 20298824,
+      "byteLength": 16
+    },
+    "model.12.cv1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        256,
+        768,
+        1,
+        1
+      ],
+      "byteOffset": 20298840,
+      "byteLength": 786432
+    },
+    "model.12.cv1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        256
+      ],
+      "byteOffset": 21085272,
+      "byteLength": 1024
+    },
+    "model.12.m.0.cv1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        128,
+        3,
+        3
+      ],
+      "byteOffset": 21086296,
+      "byteLength": 589824
+    },
+    "model.12.m.0.cv1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 21676120,
+      "byteLength": 512
+    },
+    "model.12.m.0.cv2.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        128,
+        3,
+        3
+      ],
+      "byteOffset": 21676632,
+      "byteLength": 589824
+    },
+    "model.12.m.0.cv2.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 22266456,
+      "byteLength": 512
+    },
+    "model.12.cv2.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        256,
+        384,
+        1,
+        1
+      ],
+      "byteOffset": 22266968,
+      "byteLength": 393216
+    },
+    "model.12.cv2.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        256
+      ],
+      "byteOffset": 22660184,
+      "byteLength": 1024
+    },
+    "model.15.cv1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        384,
+        1,
+        1
+      ],
+      "byteOffset": 22661208,
+      "byteLength": 196608
+    },
+    "model.15.cv1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 22857816,
+      "byteLength": 512
+    },
+    "model.15.m.0.cv1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        64,
+        3,
+        3
+      ],
+      "byteOffset": 22858328,
+      "byteLength": 147456
+    },
+    "model.15.m.0.cv1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        64
+      ],
+      "byteOffset": 23005784,
+      "byteLength": 256
+    },
+    "model.15.m.0.cv2.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        64,
+        3,
+        3
+      ],
+      "byteOffset": 23006040,
+      "byteLength": 147456
+    },
+    "model.15.m.0.cv2.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        64
+      ],
+      "byteOffset": 23153496,
+      "byteLength": 256
+    },
+    "model.15.cv2.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        192,
+        1,
+        1
+      ],
+      "byteOffset": 23153752,
+      "byteLength": 98304
+    },
+    "model.15.cv2.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 23252056,
+      "byteLength": 512
+    },
+    "model.16.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        128,
+        3,
+        3
+      ],
+      "byteOffset": 23252568,
+      "byteLength": 589824
+    },
+    "model.16.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 23842392,
+      "byteLength": 512
+    },
+    "model.22.cv2.0.0.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        128,
+        3,
+        3
+      ],
+      "byteOffset": 23842904,
+      "byteLength": 294912
+    },
+    "model.22.cv2.0.0.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        64
+      ],
+      "byteOffset": 24137816,
+      "byteLength": 256
+    },
+    "model.22.cv3.0.0.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        128,
+        3,
+        3
+      ],
+      "byteOffset": 24138072,
+      "byteLength": 589824
+    },
+    "model.22.cv3.0.0.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 24727896,
+      "byteLength": 512
+    },
+    "model.22.cv2.0.1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        64,
+        3,
+        3
+      ],
+      "byteOffset": 24728408,
+      "byteLength": 147456
+    },
+    "model.22.cv2.0.1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        64
+      ],
+      "byteOffset": 24875864,
+      "byteLength": 256
+    },
+    "model.22.cv3.0.1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        128,
+        3,
+        3
+      ],
+      "byteOffset": 24876120,
+      "byteLength": 589824
+    },
+    "model.22.cv3.0.1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 25465944,
+      "byteLength": 512
+    },
+    "model.18.cv1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        256,
+        384,
+        1,
+        1
+      ],
+      "byteOffset": 25466456,
+      "byteLength": 393216
+    },
+    "model.18.cv1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        256
+      ],
+      "byteOffset": 25859672,
+      "byteLength": 1024
+    },
+    "model.22.cv2.0.2.weight": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        64,
+        1,
+        1
+      ],
+      "byteOffset": 25860696,
+      "byteLength": 16384
+    },
+    "model.22.cv2.0.2.bias": {
+      "dataType": "float32",
+      "shape": [
+        64
+      ],
+      "byteOffset": 25877080,
+      "byteLength": 256
+    },
+    "model.22.cv3.0.2.weight": {
+      "dataType": "float32",
+      "shape": [
+        80,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 25877336,
+      "byteLength": 40960
+    },
+    "model.22.cv3.0.2.bias": {
+      "dataType": "float32",
+      "shape": [
+        80
+      ],
+      "byteOffset": 25918296,
+      "byteLength": 320
+    },
+    "/model.22/Constant_output_0": {
+      "dataType": "int64",
+      "shape": [
+        3
+      ],
+      "byteOffset": 25918616,
+      "byteLength": 24
+    },
+    "/model.22/Constant_3_output_0": {
+      "dataType": "int64",
+      "shape": [
+        3
+      ],
+      "byteOffset": 25918640,
+      "byteLength": 24
+    },
+    "model.18.m.0.cv1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        128,
+        3,
+        3
+      ],
+      "byteOffset": 25918664,
+      "byteLength": 589824
+    },
+    "model.18.m.0.cv1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 26508488,
+      "byteLength": 512
+    },
+    "model.18.m.0.cv2.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        128,
+        3,
+        3
+      ],
+      "byteOffset": 26509000,
+      "byteLength": 589824
+    },
+    "model.18.m.0.cv2.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 27098824,
+      "byteLength": 512
+    },
+    "model.18.cv2.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        256,
+        384,
+        1,
+        1
+      ],
+      "byteOffset": 27099336,
+      "byteLength": 393216
+    },
+    "model.18.cv2.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        256
+      ],
+      "byteOffset": 27492552,
+      "byteLength": 1024
+    },
+    "model.19.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        256,
+        256,
+        3,
+        3
+      ],
+      "byteOffset": 27493576,
+      "byteLength": 2359296
+    },
+    "model.19.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        256
+      ],
+      "byteOffset": 29852872,
+      "byteLength": 1024
+    },
+    "model.22.cv2.1.0.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        256,
+        3,
+        3
+      ],
+      "byteOffset": 29853896,
+      "byteLength": 589824
+    },
+    "model.22.cv2.1.0.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        64
+      ],
+      "byteOffset": 30443720,
+      "byteLength": 256
+    },
+    "model.22.cv3.1.0.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        256,
+        3,
+        3
+      ],
+      "byteOffset": 30443976,
+      "byteLength": 1179648
+    },
+    "model.22.cv3.1.0.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 31623624,
+      "byteLength": 512
+    },
+    "model.22.cv2.1.1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        64,
+        3,
+        3
+      ],
+      "byteOffset": 31624136,
+      "byteLength": 147456
+    },
+    "model.22.cv2.1.1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        64
+      ],
+      "byteOffset": 31771592,
+      "byteLength": 256
+    },
+    "model.22.cv3.1.1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        128,
+        3,
+        3
+      ],
+      "byteOffset": 31771848,
+      "byteLength": 589824
+    },
+    "model.22.cv3.1.1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 32361672,
+      "byteLength": 512
+    },
+    "model.21.cv1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        512,
+        768,
+        1,
+        1
+      ],
+      "byteOffset": 32362184,
+      "byteLength": 1572864
+    },
+    "model.21.cv1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        512
+      ],
+      "byteOffset": 33935048,
+      "byteLength": 2048
+    },
+    "model.22.cv2.1.2.weight": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        64,
+        1,
+        1
+      ],
+      "byteOffset": 33937096,
+      "byteLength": 16384
+    },
+    "model.22.cv2.1.2.bias": {
+      "dataType": "float32",
+      "shape": [
+        64
+      ],
+      "byteOffset": 33953480,
+      "byteLength": 256
+    },
+    "model.22.cv3.1.2.weight": {
+      "dataType": "float32",
+      "shape": [
+        80,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 33953736,
+      "byteLength": 40960
+    },
+    "model.22.cv3.1.2.bias": {
+      "dataType": "float32",
+      "shape": [
+        80
+      ],
+      "byteOffset": 33994696,
+      "byteLength": 320
+    },
+    "model.21.m.0.cv1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        256,
+        256,
+        3,
+        3
+      ],
+      "byteOffset": 33995016,
+      "byteLength": 2359296
+    },
+    "model.21.m.0.cv1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        256
+      ],
+      "byteOffset": 36354312,
+      "byteLength": 1024
+    },
+    "model.21.m.0.cv2.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        256,
+        256,
+        3,
+        3
+      ],
+      "byteOffset": 36355336,
+      "byteLength": 2359296
+    },
+    "model.21.m.0.cv2.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        256
+      ],
+      "byteOffset": 38714632,
+      "byteLength": 1024
+    },
+    "model.21.cv2.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        512,
+        768,
+        1,
+        1
+      ],
+      "byteOffset": 38715656,
+      "byteLength": 1572864
+    },
+    "model.21.cv2.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        512
+      ],
+      "byteOffset": 40288520,
+      "byteLength": 2048
+    },
+    "model.22.cv2.2.0.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        512,
+        3,
+        3
+      ],
+      "byteOffset": 40290568,
+      "byteLength": 1179648
+    },
+    "model.22.cv2.2.0.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        64
+      ],
+      "byteOffset": 41470216,
+      "byteLength": 256
+    },
+    "model.22.cv3.2.0.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        512,
+        3,
+        3
+      ],
+      "byteOffset": 41470472,
+      "byteLength": 2359296
+    },
+    "model.22.cv3.2.0.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 43829768,
+      "byteLength": 512
+    },
+    "model.22.cv2.2.1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        64,
+        3,
+        3
+      ],
+      "byteOffset": 43830280,
+      "byteLength": 147456
+    },
+    "model.22.cv2.2.1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        64
+      ],
+      "byteOffset": 43977736,
+      "byteLength": 256
+    },
+    "model.22.cv3.2.1.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        128,
+        128,
+        3,
+        3
+      ],
+      "byteOffset": 43977992,
+      "byteLength": 589824
+    },
+    "model.22.cv3.2.1.conv.bias": {
+      "dataType": "float32",
+      "shape": [
+        128
+      ],
+      "byteOffset": 44567816,
+      "byteLength": 512
+    },
+    "model.22.cv2.2.2.weight": {
+      "dataType": "float32",
+      "shape": [
+        64,
+        64,
+        1,
+        1
+      ],
+      "byteOffset": 44568328,
+      "byteLength": 16384
+    },
+    "model.22.cv2.2.2.bias": {
+      "dataType": "float32",
+      "shape": [
+        64
+      ],
+      "byteOffset": 44584712,
+      "byteLength": 256
+    },
+    "model.22.cv3.2.2.weight": {
+      "dataType": "float32",
+      "shape": [
+        80,
+        128,
+        1,
+        1
+      ],
+      "byteOffset": 44584968,
+      "byteLength": 40960
+    },
+    "model.22.cv3.2.2.bias": {
+      "dataType": "float32",
+      "shape": [
+        80
+      ],
+      "byteOffset": 44625928,
+      "byteLength": 320
+    },
+    "/model.22/dfl/Constant_output_0": {
+      "dataType": "int64",
+      "shape": [
+        4
+      ],
+      "byteOffset": 44626248,
+      "byteLength": 32
+    },
+    "model.22.dfl.conv.weight": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        16,
+        1,
+        1
+      ],
+      "byteOffset": 44626280,
+      "byteLength": 64
+    },
+    "/model.22/dfl/Constant_1_output_0": {
+      "dataType": "int64",
+      "shape": [
+        3
+      ],
+      "byteOffset": 44626344,
+      "byteLength": 24
+    },
+    "/model.22/Constant_7_output_0": {
+      "dataType": "int64",
+      "shape": [
+        1
+      ],
+      "byteOffset": 44626368,
+      "byteLength": 8
+    },
+    "/model.22/Mul_output_0": {
+      "dataType": "int64",
+      "shape": [
+        1
+      ],
+      "byteOffset": 44626376,
+      "byteLength": 8
+    },
+    "/model.22/Constant_6_output_0": {
+      "dataType": "int64",
+      "shape": [
+        1
+      ],
+      "byteOffset": 44626384,
+      "byteLength": 8
+    },
+    "/model.22/Mul_1_output_0": {
+      "dataType": "int64",
+      "shape": [
+        1
+      ],
+      "byteOffset": 44626392,
+      "byteLength": 8
+    },
+    "/model.22/Constant_12_output_0": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        2,
+        8400
+      ],
+      "byteOffset": 44626400,
+      "byteLength": 67200
+    },
+    "/model.22/Constant_13_output_0": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        2,
+        8400
+      ],
+      "byteOffset": 44693600,
+      "byteLength": 67200
+    },
+    "/model.22/Constant_14_output_0": {
+      "dataType": "float32",
+      "shape": [],
+      "byteOffset": 44760800,
+      "byteLength": 4
+    },
+    "/model.22/Constant_15_output_0": {
+      "dataType": "float32",
+      "shape": [
+        1,
+        8400
+      ],
+      "byteOffset": 44760804,
+      "byteLength": 33600
+    }
+  }
+}

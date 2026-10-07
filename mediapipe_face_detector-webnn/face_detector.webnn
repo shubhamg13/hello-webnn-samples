@@ -1,0 +1,426 @@
+webnn_graph "face_detector" v1 {
+  inputs {
+    input: f32[1, 128, 128, 3];
+  }
+
+  consts {
+    conv2d/Kernel: f16[24, 5, 5, 3] @weights("conv2d/Kernel");
+    conv2d/Bias: f16[24] @weights("conv2d/Bias");
+    depthwise_conv2d/Kernel: f16[1, 3, 3, 24] @weights("depthwise_conv2d/Kernel");
+    depthwise_conv2d/Bias: f16[24] @weights("depthwise_conv2d/Bias");
+    conv2d_1/Kernel: f16[24, 1, 1, 24] @weights("conv2d_1/Kernel");
+    conv2d_1/Bias: f16[24] @weights("conv2d_1/Bias");
+    depthwise_conv2d_1/Kernel: f16[1, 3, 3, 24] @weights("depthwise_conv2d_1/Kernel");
+    depthwise_conv2d_1/Bias: f16[24] @weights("depthwise_conv2d_1/Bias");
+    conv2d_2/Kernel: f16[28, 1, 1, 24] @weights("conv2d_2/Kernel");
+    conv2d_2/Bias: f16[28] @weights("conv2d_2/Bias");
+    channel_padding/Paddings: i32[4, 2] @weights("channel_padding/Paddings");
+    depthwise_conv2d_2/Kernel: f16[1, 3, 3, 28] @weights("depthwise_conv2d_2/Kernel");
+    depthwise_conv2d_2/Bias: f16[28] @weights("depthwise_conv2d_2/Bias");
+    conv2d_3/Kernel: f16[32, 1, 1, 28] @weights("conv2d_3/Kernel");
+    conv2d_3/Bias: f16[32] @weights("conv2d_3/Bias");
+    channel_padding_1/Paddings: i32[4, 2] @weights("channel_padding_1/Paddings");
+    depthwise_conv2d_3/Kernel: f16[1, 3, 3, 32] @weights("depthwise_conv2d_3/Kernel");
+    depthwise_conv2d_3/Bias: f16[32] @weights("depthwise_conv2d_3/Bias");
+    conv2d_4/Kernel: f16[36, 1, 1, 32] @weights("conv2d_4/Kernel");
+    conv2d_4/Bias: f16[36] @weights("conv2d_4/Bias");
+    channel_padding_2/Paddings: i32[4, 2] @weights("channel_padding_2/Paddings");
+    depthwise_conv2d_4/Kernel: f16[1, 3, 3, 36] @weights("depthwise_conv2d_4/Kernel");
+    depthwise_conv2d_4/Bias: f16[36] @weights("depthwise_conv2d_4/Bias");
+    conv2d_5/Kernel: f16[42, 1, 1, 36] @weights("conv2d_5/Kernel");
+    conv2d_5/Bias: f16[42] @weights("conv2d_5/Bias");
+    channel_padding_3/Paddings: i32[4, 2] @weights("channel_padding_3/Paddings");
+    depthwise_conv2d_5/Kernel: f16[1, 3, 3, 42] @weights("depthwise_conv2d_5/Kernel");
+    depthwise_conv2d_5/Bias: f16[42] @weights("depthwise_conv2d_5/Bias");
+    conv2d_6/Kernel: f16[48, 1, 1, 42] @weights("conv2d_6/Kernel");
+    conv2d_6/Bias: f16[48] @weights("conv2d_6/Bias");
+    channel_padding_4/Paddings: i32[4, 2] @weights("channel_padding_4/Paddings");
+    depthwise_conv2d_6/Kernel: f16[1, 3, 3, 48] @weights("depthwise_conv2d_6/Kernel");
+    depthwise_conv2d_6/Bias: f16[48] @weights("depthwise_conv2d_6/Bias");
+    conv2d_7/Kernel: f16[56, 1, 1, 48] @weights("conv2d_7/Kernel");
+    conv2d_7/Bias: f16[56] @weights("conv2d_7/Bias");
+    channel_padding_5/Paddings: i32[4, 2] @weights("channel_padding_5/Paddings");
+    depthwise_conv2d_7/Kernel: f16[1, 3, 3, 56] @weights("depthwise_conv2d_7/Kernel");
+    depthwise_conv2d_7/Bias: f16[56] @weights("depthwise_conv2d_7/Bias");
+    conv2d_8/Kernel: f16[64, 1, 1, 56] @weights("conv2d_8/Kernel");
+    conv2d_8/Bias: f16[64] @weights("conv2d_8/Bias");
+    channel_padding_6/Paddings: i32[4, 2] @weights("channel_padding_6/Paddings");
+    depthwise_conv2d_8/Kernel: f16[1, 3, 3, 64] @weights("depthwise_conv2d_8/Kernel");
+    depthwise_conv2d_8/Bias: f16[64] @weights("depthwise_conv2d_8/Bias");
+    conv2d_9/Kernel: f16[72, 1, 1, 64] @weights("conv2d_9/Kernel");
+    conv2d_9/Bias: f16[72] @weights("conv2d_9/Bias");
+    channel_padding_7/Paddings: i32[4, 2] @weights("channel_padding_7/Paddings");
+    depthwise_conv2d_9/Kernel: f16[1, 3, 3, 72] @weights("depthwise_conv2d_9/Kernel");
+    depthwise_conv2d_9/Bias: f16[72] @weights("depthwise_conv2d_9/Bias");
+    conv2d_10/Kernel: f16[80, 1, 1, 72] @weights("conv2d_10/Kernel");
+    conv2d_10/Bias: f16[80] @weights("conv2d_10/Bias");
+    channel_padding_8/Paddings: i32[4, 2] @weights("channel_padding_8/Paddings");
+    depthwise_conv2d_10/Kernel: f16[1, 3, 3, 80] @weights("depthwise_conv2d_10/Kernel");
+    depthwise_conv2d_10/Bias: f16[80] @weights("depthwise_conv2d_10/Bias");
+    conv2d_11/Kernel: f16[88, 1, 1, 80] @weights("conv2d_11/Kernel");
+    conv2d_11/Bias: f16[88] @weights("conv2d_11/Bias");
+    channel_padding_9/Paddings: i32[4, 2] @weights("channel_padding_9/Paddings");
+    depthwise_conv2d_11/Kernel: f16[1, 3, 3, 88] @weights("depthwise_conv2d_11/Kernel");
+    depthwise_conv2d_11/Bias: f16[88] @weights("depthwise_conv2d_11/Bias");
+    conv2d_12/Kernel: f16[96, 1, 1, 88] @weights("conv2d_12/Kernel");
+    conv2d_12/Bias: f16[96] @weights("conv2d_12/Bias");
+    channel_padding_10/Paddings: i32[4, 2] @weights("channel_padding_10/Paddings");
+    depthwise_conv2d_12/Kernel: f16[1, 3, 3, 96] @weights("depthwise_conv2d_12/Kernel");
+    depthwise_conv2d_12/Bias: f16[96] @weights("depthwise_conv2d_12/Bias");
+    conv2d_13/Kernel: f16[96, 1, 1, 96] @weights("conv2d_13/Kernel");
+    conv2d_13/Bias: f16[96] @weights("conv2d_13/Bias");
+    depthwise_conv2d_13/Kernel: f16[1, 3, 3, 96] @weights("depthwise_conv2d_13/Kernel");
+    depthwise_conv2d_13/Bias: f16[96] @weights("depthwise_conv2d_13/Bias");
+    conv2d_14/Kernel: f16[96, 1, 1, 96] @weights("conv2d_14/Kernel");
+    conv2d_14/Bias: f16[96] @weights("conv2d_14/Bias");
+    depthwise_conv2d_14/Kernel: f16[1, 3, 3, 96] @weights("depthwise_conv2d_14/Kernel");
+    depthwise_conv2d_14/Bias: f16[96] @weights("depthwise_conv2d_14/Bias");
+    conv2d_15/Kernel: f16[96, 1, 1, 96] @weights("conv2d_15/Kernel");
+    conv2d_15/Bias: f16[96] @weights("conv2d_15/Bias");
+    depthwise_conv2d_15/Kernel: f16[1, 3, 3, 96] @weights("depthwise_conv2d_15/Kernel");
+    depthwise_conv2d_15/Bias: f16[96] @weights("depthwise_conv2d_15/Bias");
+    conv2d_16/Kernel: f16[96, 1, 1, 96] @weights("conv2d_16/Kernel");
+    conv2d_16/Bias: f16[96] @weights("conv2d_16/Bias");
+    classificator_8/Kernel: f16[2, 1, 1, 88] @weights("classificator_8/Kernel");
+    classificator_8/Bias: f16[2] @weights("classificator_8/Bias");
+    classificator_16/Kernel: f16[6, 1, 1, 96] @weights("classificator_16/Kernel");
+    classificator_16/Bias: f16[6] @weights("classificator_16/Bias");
+    regressor_8/Kernel: f16[32, 1, 1, 88] @weights("regressor_8/Kernel");
+    regressor_8/Bias: f16[32] @weights("regressor_8/Bias");
+    regressor_16/Kernel: f16[96, 1, 1, 96] @weights("regressor_16/Kernel");
+    regressor_16/Bias: f16[96] @weights("regressor_16/Bias");
+  }
+
+  nodes {
+    # DEQUANTIZE (tflite)
+    conv2d/Bias_dequantize = DEQUANTIZE(conv2d/Bias);
+    # DEQUANTIZE (tflite)
+    conv2d/Kernel_dequantize = DEQUANTIZE(conv2d/Kernel);
+    # CONV_2D (tflite)
+    conv2d = CONV_2D(input, conv2d/Kernel_dequantize, conv2d/Bias_dequantize, padding="SAME", stride_w=2, stride_h=2, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # RELU (tflite)
+    activation = RELU(conv2d);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d/Bias_dequantize = DEQUANTIZE(depthwise_conv2d/Bias);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d/Kernel_dequantize = DEQUANTIZE(depthwise_conv2d/Kernel);
+    # DEPTHWISE_CONV_2D (tflite)
+    depthwise_conv2d = DEPTHWISE_CONV_2D(activation, depthwise_conv2d/Kernel_dequantize, depthwise_conv2d/Bias_dequantize, padding="SAME", stride_w=1, stride_h=1, depth_multiplier=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # DEQUANTIZE (tflite)
+    conv2d_1/Bias_dequantize = DEQUANTIZE(conv2d_1/Bias);
+    # DEQUANTIZE (tflite)
+    conv2d_1/Kernel_dequantize = DEQUANTIZE(conv2d_1/Kernel);
+    # CONV_2D (tflite)
+    conv2d_1 = CONV_2D(depthwise_conv2d, conv2d_1/Kernel_dequantize, conv2d_1/Bias_dequantize, padding="VALID", stride_w=1, stride_h=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # ADD (tflite)
+    add__xeno_compat__1 = ADD(activation, conv2d_1, fused_activation="NONE");
+    # RELU (tflite)
+    activation_1 = RELU(add__xeno_compat__1);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_1/Kernel_dequantize = DEQUANTIZE(depthwise_conv2d_1/Kernel);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_1/Bias_dequantize = DEQUANTIZE(depthwise_conv2d_1/Bias);
+    # DEPTHWISE_CONV_2D (tflite)
+    depthwise_conv2d_1 = DEPTHWISE_CONV_2D(activation_1, depthwise_conv2d_1/Kernel_dequantize, depthwise_conv2d_1/Bias_dequantize, padding="SAME", stride_w=1, stride_h=1, depth_multiplier=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # DEQUANTIZE (tflite)
+    conv2d_2/Bias_dequantize = DEQUANTIZE(conv2d_2/Bias);
+    # DEQUANTIZE (tflite)
+    conv2d_2/Kernel_dequantize = DEQUANTIZE(conv2d_2/Kernel);
+    # CONV_2D (tflite)
+    conv2d_2 = CONV_2D(depthwise_conv2d_1, conv2d_2/Kernel_dequantize, conv2d_2/Bias_dequantize, padding="VALID", stride_w=1, stride_h=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # PAD (tflite)
+    channel_padding = PAD(activation_1, channel_padding/Paddings);
+    # ADD (tflite)
+    add_1__xeno_compat__1 = ADD(channel_padding, conv2d_2, fused_activation="NONE");
+    # RELU (tflite)
+    activation_2 = RELU(add_1__xeno_compat__1);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_2/Bias_dequantize = DEQUANTIZE(depthwise_conv2d_2/Bias);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_2/Kernel_dequantize = DEQUANTIZE(depthwise_conv2d_2/Kernel);
+    # DEPTHWISE_CONV_2D (tflite)
+    depthwise_conv2d_2 = DEPTHWISE_CONV_2D(activation_2, depthwise_conv2d_2/Kernel_dequantize, depthwise_conv2d_2/Bias_dequantize, padding="SAME", stride_w=2, stride_h=2, depth_multiplier=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # MAX_POOL_2D (tflite)
+    max_pooling2d = MAX_POOL_2D(activation_2, padding="SAME", stride_w=2, stride_h=2, filter_width=2, filter_height=2, fused_activation="NONE");
+    # DEQUANTIZE (tflite)
+    conv2d_3/Bias_dequantize = DEQUANTIZE(conv2d_3/Bias);
+    # DEQUANTIZE (tflite)
+    conv2d_3/Kernel_dequantize = DEQUANTIZE(conv2d_3/Kernel);
+    # CONV_2D (tflite)
+    conv2d_3 = CONV_2D(depthwise_conv2d_2, conv2d_3/Kernel_dequantize, conv2d_3/Bias_dequantize, padding="VALID", stride_w=1, stride_h=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # PAD (tflite)
+    channel_padding_1 = PAD(max_pooling2d, channel_padding_1/Paddings);
+    # ADD (tflite)
+    add_2__xeno_compat__1 = ADD(channel_padding_1, conv2d_3, fused_activation="NONE");
+    # RELU (tflite)
+    activation_3 = RELU(add_2__xeno_compat__1);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_3/Bias_dequantize = DEQUANTIZE(depthwise_conv2d_3/Bias);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_3/Kernel_dequantize = DEQUANTIZE(depthwise_conv2d_3/Kernel);
+    # DEPTHWISE_CONV_2D (tflite)
+    depthwise_conv2d_3 = DEPTHWISE_CONV_2D(activation_3, depthwise_conv2d_3/Kernel_dequantize, depthwise_conv2d_3/Bias_dequantize, padding="SAME", stride_w=1, stride_h=1, depth_multiplier=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # DEQUANTIZE (tflite)
+    conv2d_4/Bias_dequantize = DEQUANTIZE(conv2d_4/Bias);
+    # DEQUANTIZE (tflite)
+    conv2d_4/Kernel_dequantize = DEQUANTIZE(conv2d_4/Kernel);
+    # CONV_2D (tflite)
+    conv2d_4 = CONV_2D(depthwise_conv2d_3, conv2d_4/Kernel_dequantize, conv2d_4/Bias_dequantize, padding="VALID", stride_w=1, stride_h=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # PAD (tflite)
+    channel_padding_2 = PAD(activation_3, channel_padding_2/Paddings);
+    # ADD (tflite)
+    add_3__xeno_compat__1 = ADD(channel_padding_2, conv2d_4, fused_activation="NONE");
+    # RELU (tflite)
+    activation_4 = RELU(add_3__xeno_compat__1);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_4/Bias_dequantize = DEQUANTIZE(depthwise_conv2d_4/Bias);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_4/Kernel_dequantize = DEQUANTIZE(depthwise_conv2d_4/Kernel);
+    # DEPTHWISE_CONV_2D (tflite)
+    depthwise_conv2d_4 = DEPTHWISE_CONV_2D(activation_4, depthwise_conv2d_4/Kernel_dequantize, depthwise_conv2d_4/Bias_dequantize, padding="SAME", stride_w=1, stride_h=1, depth_multiplier=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # DEQUANTIZE (tflite)
+    conv2d_5/Bias_dequantize = DEQUANTIZE(conv2d_5/Bias);
+    # DEQUANTIZE (tflite)
+    conv2d_5/Kernel_dequantize = DEQUANTIZE(conv2d_5/Kernel);
+    # CONV_2D (tflite)
+    conv2d_5 = CONV_2D(depthwise_conv2d_4, conv2d_5/Kernel_dequantize, conv2d_5/Bias_dequantize, padding="VALID", stride_w=1, stride_h=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # PAD (tflite)
+    channel_padding_3 = PAD(activation_4, channel_padding_3/Paddings);
+    # ADD (tflite)
+    add_4__xeno_compat__1 = ADD(channel_padding_3, conv2d_5, fused_activation="NONE");
+    # RELU (tflite)
+    activation_5 = RELU(add_4__xeno_compat__1);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_5/Bias_dequantize = DEQUANTIZE(depthwise_conv2d_5/Bias);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_5/Kernel_dequantize = DEQUANTIZE(depthwise_conv2d_5/Kernel);
+    # DEPTHWISE_CONV_2D (tflite)
+    depthwise_conv2d_5 = DEPTHWISE_CONV_2D(activation_5, depthwise_conv2d_5/Kernel_dequantize, depthwise_conv2d_5/Bias_dequantize, padding="SAME", stride_w=2, stride_h=2, depth_multiplier=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # MAX_POOL_2D (tflite)
+    max_pooling2d_1 = MAX_POOL_2D(activation_5, padding="SAME", stride_w=2, stride_h=2, filter_width=2, filter_height=2, fused_activation="NONE");
+    # DEQUANTIZE (tflite)
+    conv2d_6/Bias_dequantize = DEQUANTIZE(conv2d_6/Bias);
+    # DEQUANTIZE (tflite)
+    conv2d_6/Kernel_dequantize = DEQUANTIZE(conv2d_6/Kernel);
+    # CONV_2D (tflite)
+    conv2d_6 = CONV_2D(depthwise_conv2d_5, conv2d_6/Kernel_dequantize, conv2d_6/Bias_dequantize, padding="VALID", stride_w=1, stride_h=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # PAD (tflite)
+    channel_padding_4 = PAD(max_pooling2d_1, channel_padding_4/Paddings);
+    # ADD (tflite)
+    add_5__xeno_compat__1 = ADD(channel_padding_4, conv2d_6, fused_activation="NONE");
+    # RELU (tflite)
+    activation_6 = RELU(add_5__xeno_compat__1);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_6/Bias_dequantize = DEQUANTIZE(depthwise_conv2d_6/Bias);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_6/Kernel_dequantize = DEQUANTIZE(depthwise_conv2d_6/Kernel);
+    # DEPTHWISE_CONV_2D (tflite)
+    depthwise_conv2d_6 = DEPTHWISE_CONV_2D(activation_6, depthwise_conv2d_6/Kernel_dequantize, depthwise_conv2d_6/Bias_dequantize, padding="SAME", stride_w=1, stride_h=1, depth_multiplier=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # DEQUANTIZE (tflite)
+    conv2d_7/Bias_dequantize = DEQUANTIZE(conv2d_7/Bias);
+    # DEQUANTIZE (tflite)
+    conv2d_7/Kernel_dequantize = DEQUANTIZE(conv2d_7/Kernel);
+    # CONV_2D (tflite)
+    conv2d_7 = CONV_2D(depthwise_conv2d_6, conv2d_7/Kernel_dequantize, conv2d_7/Bias_dequantize, padding="VALID", stride_w=1, stride_h=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # PAD (tflite)
+    channel_padding_5 = PAD(activation_6, channel_padding_5/Paddings);
+    # ADD (tflite)
+    add_6__xeno_compat__1 = ADD(channel_padding_5, conv2d_7, fused_activation="NONE");
+    # RELU (tflite)
+    activation_7 = RELU(add_6__xeno_compat__1);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_7/Bias_dequantize = DEQUANTIZE(depthwise_conv2d_7/Bias);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_7/Kernel_dequantize = DEQUANTIZE(depthwise_conv2d_7/Kernel);
+    # DEPTHWISE_CONV_2D (tflite)
+    depthwise_conv2d_7 = DEPTHWISE_CONV_2D(activation_7, depthwise_conv2d_7/Kernel_dequantize, depthwise_conv2d_7/Bias_dequantize, padding="SAME", stride_w=1, stride_h=1, depth_multiplier=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # DEQUANTIZE (tflite)
+    conv2d_8/Kernel_dequantize = DEQUANTIZE(conv2d_8/Kernel);
+    # DEQUANTIZE (tflite)
+    conv2d_8/Bias_dequantize = DEQUANTIZE(conv2d_8/Bias);
+    # CONV_2D (tflite)
+    conv2d_8 = CONV_2D(depthwise_conv2d_7, conv2d_8/Kernel_dequantize, conv2d_8/Bias_dequantize, padding="VALID", stride_w=1, stride_h=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # PAD (tflite)
+    channel_padding_6 = PAD(activation_7, channel_padding_6/Paddings);
+    # ADD (tflite)
+    add_7__xeno_compat__1 = ADD(channel_padding_6, conv2d_8, fused_activation="NONE");
+    # RELU (tflite)
+    activation_8 = RELU(add_7__xeno_compat__1);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_8/Kernel_dequantize = DEQUANTIZE(depthwise_conv2d_8/Kernel);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_8/Bias_dequantize = DEQUANTIZE(depthwise_conv2d_8/Bias);
+    # DEPTHWISE_CONV_2D (tflite)
+    depthwise_conv2d_8 = DEPTHWISE_CONV_2D(activation_8, depthwise_conv2d_8/Kernel_dequantize, depthwise_conv2d_8/Bias_dequantize, padding="SAME", stride_w=1, stride_h=1, depth_multiplier=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # DEQUANTIZE (tflite)
+    conv2d_9/Bias_dequantize = DEQUANTIZE(conv2d_9/Bias);
+    # DEQUANTIZE (tflite)
+    conv2d_9/Kernel_dequantize = DEQUANTIZE(conv2d_9/Kernel);
+    # CONV_2D (tflite)
+    conv2d_9 = CONV_2D(depthwise_conv2d_8, conv2d_9/Kernel_dequantize, conv2d_9/Bias_dequantize, padding="VALID", stride_w=1, stride_h=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # PAD (tflite)
+    channel_padding_7 = PAD(activation_8, channel_padding_7/Paddings);
+    # ADD (tflite)
+    add_8__xeno_compat__1 = ADD(channel_padding_7, conv2d_9, fused_activation="NONE");
+    # RELU (tflite)
+    activation_9 = RELU(add_8__xeno_compat__1);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_9/Bias_dequantize = DEQUANTIZE(depthwise_conv2d_9/Bias);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_9/Kernel_dequantize = DEQUANTIZE(depthwise_conv2d_9/Kernel);
+    # DEPTHWISE_CONV_2D (tflite)
+    depthwise_conv2d_9 = DEPTHWISE_CONV_2D(activation_9, depthwise_conv2d_9/Kernel_dequantize, depthwise_conv2d_9/Bias_dequantize, padding="SAME", stride_w=1, stride_h=1, depth_multiplier=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # DEQUANTIZE (tflite)
+    conv2d_10/Bias_dequantize = DEQUANTIZE(conv2d_10/Bias);
+    # DEQUANTIZE (tflite)
+    conv2d_10/Kernel_dequantize = DEQUANTIZE(conv2d_10/Kernel);
+    # CONV_2D (tflite)
+    conv2d_10 = CONV_2D(depthwise_conv2d_9, conv2d_10/Kernel_dequantize, conv2d_10/Bias_dequantize, padding="VALID", stride_w=1, stride_h=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # PAD (tflite)
+    channel_padding_8 = PAD(activation_9, channel_padding_8/Paddings);
+    # ADD (tflite)
+    add_9__xeno_compat__1 = ADD(channel_padding_8, conv2d_10, fused_activation="NONE");
+    # RELU (tflite)
+    activation_10 = RELU(add_9__xeno_compat__1);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_10/Bias_dequantize = DEQUANTIZE(depthwise_conv2d_10/Bias);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_10/Kernel_dequantize = DEQUANTIZE(depthwise_conv2d_10/Kernel);
+    # DEPTHWISE_CONV_2D (tflite)
+    depthwise_conv2d_10 = DEPTHWISE_CONV_2D(activation_10, depthwise_conv2d_10/Kernel_dequantize, depthwise_conv2d_10/Bias_dequantize, padding="SAME", stride_w=1, stride_h=1, depth_multiplier=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # DEQUANTIZE (tflite)
+    conv2d_11/Bias_dequantize = DEQUANTIZE(conv2d_11/Bias);
+    # DEQUANTIZE (tflite)
+    conv2d_11/Kernel_dequantize = DEQUANTIZE(conv2d_11/Kernel);
+    # CONV_2D (tflite)
+    conv2d_11 = CONV_2D(depthwise_conv2d_10, conv2d_11/Kernel_dequantize, conv2d_11/Bias_dequantize, padding="VALID", stride_w=1, stride_h=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # PAD (tflite)
+    channel_padding_9 = PAD(activation_10, channel_padding_9/Paddings);
+    # ADD (tflite)
+    add_10__xeno_compat__1 = ADD(channel_padding_9, conv2d_11, fused_activation="NONE");
+    # RELU (tflite)
+    activation_11 = RELU(add_10__xeno_compat__1);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_11/Bias_dequantize = DEQUANTIZE(depthwise_conv2d_11/Bias);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_11/Kernel_dequantize = DEQUANTIZE(depthwise_conv2d_11/Kernel);
+    # DEPTHWISE_CONV_2D (tflite)
+    depthwise_conv2d_11 = DEPTHWISE_CONV_2D(activation_11, depthwise_conv2d_11/Kernel_dequantize, depthwise_conv2d_11/Bias_dequantize, padding="SAME", stride_w=2, stride_h=2, depth_multiplier=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # MAX_POOL_2D (tflite)
+    max_pooling2d_2 = MAX_POOL_2D(activation_11, padding="SAME", stride_w=2, stride_h=2, filter_width=2, filter_height=2, fused_activation="NONE");
+    # DEQUANTIZE (tflite)
+    conv2d_12/Bias_dequantize = DEQUANTIZE(conv2d_12/Bias);
+    # DEQUANTIZE (tflite)
+    conv2d_12/Kernel_dequantize = DEQUANTIZE(conv2d_12/Kernel);
+    # CONV_2D (tflite)
+    conv2d_12 = CONV_2D(depthwise_conv2d_11, conv2d_12/Kernel_dequantize, conv2d_12/Bias_dequantize, padding="VALID", stride_w=1, stride_h=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # PAD (tflite)
+    channel_padding_10 = PAD(max_pooling2d_2, channel_padding_10/Paddings);
+    # ADD (tflite)
+    add_11__xeno_compat__1 = ADD(channel_padding_10, conv2d_12, fused_activation="NONE");
+    # RELU (tflite)
+    activation_12 = RELU(add_11__xeno_compat__1);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_12/Bias_dequantize = DEQUANTIZE(depthwise_conv2d_12/Bias);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_12/Kernel_dequantize = DEQUANTIZE(depthwise_conv2d_12/Kernel);
+    # DEPTHWISE_CONV_2D (tflite)
+    depthwise_conv2d_12 = DEPTHWISE_CONV_2D(activation_12, depthwise_conv2d_12/Kernel_dequantize, depthwise_conv2d_12/Bias_dequantize, padding="SAME", stride_w=1, stride_h=1, depth_multiplier=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # DEQUANTIZE (tflite)
+    conv2d_13/Bias_dequantize = DEQUANTIZE(conv2d_13/Bias);
+    # DEQUANTIZE (tflite)
+    conv2d_13/Kernel_dequantize = DEQUANTIZE(conv2d_13/Kernel);
+    # CONV_2D (tflite)
+    conv2d_13 = CONV_2D(depthwise_conv2d_12, conv2d_13/Kernel_dequantize, conv2d_13/Bias_dequantize, padding="VALID", stride_w=1, stride_h=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # ADD (tflite)
+    add_12__xeno_compat__1 = ADD(activation_12, conv2d_13, fused_activation="NONE");
+    # RELU (tflite)
+    activation_13 = RELU(add_12__xeno_compat__1);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_13/Bias_dequantize = DEQUANTIZE(depthwise_conv2d_13/Bias);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_13/Kernel_dequantize = DEQUANTIZE(depthwise_conv2d_13/Kernel);
+    # DEPTHWISE_CONV_2D (tflite)
+    depthwise_conv2d_13 = DEPTHWISE_CONV_2D(activation_13, depthwise_conv2d_13/Kernel_dequantize, depthwise_conv2d_13/Bias_dequantize, padding="SAME", stride_w=1, stride_h=1, depth_multiplier=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # DEQUANTIZE (tflite)
+    conv2d_14/Bias_dequantize = DEQUANTIZE(conv2d_14/Bias);
+    # DEQUANTIZE (tflite)
+    conv2d_14/Kernel_dequantize = DEQUANTIZE(conv2d_14/Kernel);
+    # CONV_2D (tflite)
+    conv2d_14 = CONV_2D(depthwise_conv2d_13, conv2d_14/Kernel_dequantize, conv2d_14/Bias_dequantize, padding="VALID", stride_w=1, stride_h=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # ADD (tflite)
+    add_13__xeno_compat__1 = ADD(activation_13, conv2d_14, fused_activation="NONE");
+    # RELU (tflite)
+    activation_14 = RELU(add_13__xeno_compat__1);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_14/Bias_dequantize = DEQUANTIZE(depthwise_conv2d_14/Bias);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_14/Kernel_dequantize = DEQUANTIZE(depthwise_conv2d_14/Kernel);
+    # DEPTHWISE_CONV_2D (tflite)
+    depthwise_conv2d_14 = DEPTHWISE_CONV_2D(activation_14, depthwise_conv2d_14/Kernel_dequantize, depthwise_conv2d_14/Bias_dequantize, padding="SAME", stride_w=1, stride_h=1, depth_multiplier=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # DEQUANTIZE (tflite)
+    conv2d_15/Bias_dequantize = DEQUANTIZE(conv2d_15/Bias);
+    # DEQUANTIZE (tflite)
+    conv2d_15/Kernel_dequantize = DEQUANTIZE(conv2d_15/Kernel);
+    # CONV_2D (tflite)
+    conv2d_15 = CONV_2D(depthwise_conv2d_14, conv2d_15/Kernel_dequantize, conv2d_15/Bias_dequantize, padding="VALID", stride_w=1, stride_h=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # ADD (tflite)
+    add_14__xeno_compat__1 = ADD(activation_14, conv2d_15, fused_activation="NONE");
+    # RELU (tflite)
+    activation_15 = RELU(add_14__xeno_compat__1);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_15/Kernel_dequantize = DEQUANTIZE(depthwise_conv2d_15/Kernel);
+    # DEQUANTIZE (tflite)
+    depthwise_conv2d_15/Bias_dequantize = DEQUANTIZE(depthwise_conv2d_15/Bias);
+    # DEPTHWISE_CONV_2D (tflite)
+    depthwise_conv2d_15 = DEPTHWISE_CONV_2D(activation_15, depthwise_conv2d_15/Kernel_dequantize, depthwise_conv2d_15/Bias_dequantize, padding="SAME", stride_w=1, stride_h=1, depth_multiplier=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # DEQUANTIZE (tflite)
+    conv2d_16/Bias_dequantize = DEQUANTIZE(conv2d_16/Bias);
+    # DEQUANTIZE (tflite)
+    conv2d_16/Kernel_dequantize = DEQUANTIZE(conv2d_16/Kernel);
+    # CONV_2D (tflite)
+    conv2d_16 = CONV_2D(depthwise_conv2d_15, conv2d_16/Kernel_dequantize, conv2d_16/Bias_dequantize, padding="VALID", stride_w=1, stride_h=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # ADD (tflite)
+    add_15__xeno_compat__1 = ADD(activation_15, conv2d_16, fused_activation="NONE");
+    # RELU (tflite)
+    activation_16 = RELU(add_15__xeno_compat__1);
+    # DEQUANTIZE (tflite)
+    classificator_8/Bias_dequantize = DEQUANTIZE(classificator_8/Bias);
+    # DEQUANTIZE (tflite)
+    classificator_8/Kernel_dequantize = DEQUANTIZE(classificator_8/Kernel);
+    # CONV_2D (tflite)
+    classificator_8 = CONV_2D(activation_11, classificator_8/Kernel_dequantize, classificator_8/Bias_dequantize, padding="SAME", stride_w=1, stride_h=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # DEQUANTIZE (tflite)
+    classificator_16/Kernel_dequantize = DEQUANTIZE(classificator_16/Kernel);
+    # DEQUANTIZE (tflite)
+    classificator_16/Bias_dequantize = DEQUANTIZE(classificator_16/Bias);
+    # CONV_2D (tflite)
+    classificator_16 = CONV_2D(activation_16, classificator_16/Kernel_dequantize, classificator_16/Bias_dequantize, padding="SAME", stride_w=1, stride_h=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # DEQUANTIZE (tflite)
+    regressor_8/Kernel_dequantize = DEQUANTIZE(regressor_8/Kernel);
+    # DEQUANTIZE (tflite)
+    regressor_8/Bias_dequantize = DEQUANTIZE(regressor_8/Bias);
+    # CONV_2D (tflite)
+    regressor_8 = CONV_2D(activation_11, regressor_8/Kernel_dequantize, regressor_8/Bias_dequantize, padding="SAME", stride_w=1, stride_h=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # DEQUANTIZE (tflite)
+    regressor_16/Bias_dequantize = DEQUANTIZE(regressor_16/Bias);
+    # DEQUANTIZE (tflite)
+    regressor_16/Kernel_dequantize = DEQUANTIZE(regressor_16/Kernel);
+    # CONV_2D (tflite)
+    regressor_16 = CONV_2D(activation_16, regressor_16/Kernel_dequantize, regressor_16/Bias_dequantize, padding="SAME", stride_w=1, stride_h=1, dilation_w_factor=1, dilation_h_factor=1, fused_activation="NONE");
+    # RESHAPE (tflite)
+    reshape = RESHAPE(classificator_8, new_shape=[1, -1, 1]);
+    # RESHAPE (tflite)
+    reshape_2 = RESHAPE(classificator_16, new_shape=[1, -1, 1]);
+    # RESHAPE (tflite)
+    reshape_1 = RESHAPE(regressor_8, new_shape=[1, -1, 16]);
+    # RESHAPE (tflite)
+    reshape_3 = RESHAPE(regressor_16, new_shape=[1, -1, 16]);
+    # CONCATENATION (tflite)
+    classificators = CONCATENATION(reshape, reshape_2, axis=1, fused_activation="NONE");
+    # CONCATENATION (tflite)
+    regressors = CONCATENATION(reshape_1, reshape_3, axis=1, fused_activation="NONE");
+  }
+
+  outputs { regressors, classificators; }
+}

@@ -1,0 +1,815 @@
+class WeightsFile {
+  constructor(buffer, manifest) {
+    this.buffer = buffer;
+    this.manifest = manifest;
+  }
+
+  static async load(weightsPath, manifestPath) {
+    const [wRes, mRes] = await Promise.all([fetch(weightsPath), fetch(manifestPath)]);
+    if (!wRes.ok) throw new Error('Failed to load weights: ' + wRes.statusText);
+    if (!mRes.ok) throw new Error('Failed to load manifest: ' + mRes.statusText);
+    const buffer = await wRes.arrayBuffer();
+    const manifest = await mRes.json();
+    if (manifest.format !== 'wg-weights-manifest') throw new Error('Invalid manifest format');
+    const magic = new TextDecoder().decode(new Uint8Array(buffer, 0, 4));
+    if (magic !== 'WGWT') throw new Error('Invalid weights file');
+    return new WeightsFile(buffer, manifest);
+  }
+
+  getSlice(name) {
+    const t = this.manifest.tensors[name];
+    if (!t) throw new Error('Tensor not found: ' + name);
+    return t;
+  }
+
+  getData(name) {
+    const t = this.getSlice(name);
+    return this.buffer.slice(t.byteOffset, t.byteOffset + t.byteLength);
+  }
+}
+
+/**
+ * Build WebNN graph for model: face_landmark
+ * Source format: onnx
+ */
+async function buildGraph(context, weights) {
+  const builder = new MLGraphBuilder(context);
+
+  // Graph inputs
+  const input_1 = builder.input('input_1', { dataType: 'float32', shape: [1,192,192,3] });
+
+  // Constants (loaded from weights file)
+  const pad_const__611 = (() => {
+    const sl = weights.getSlice('pad_const__611');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'int64', shape: [8] }, new BigInt64Array(buf));
+  })();
+  const pad_const__584 = (() => {
+    const sl = weights.getSlice('pad_const__584');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'int64', shape: [8] }, new BigInt64Array(buf));
+  })();
+  const pad_const__557 = (() => {
+    const sl = weights.getSlice('pad_const__557');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'int64', shape: [8] }, new BigInt64Array(buf));
+  })();
+  const new_shape__899 = (() => {
+    const sl = weights.getSlice('new_shape__899');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'int64', shape: [4] }, new BigInt64Array(buf));
+  })();
+  const new_shape__897 = (() => {
+    const sl = weights.getSlice('new_shape__897');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'int64', shape: [4] }, new BigInt64Array(buf));
+  })();
+  const depthwise_conv2d_6_Bias = (() => {
+    const sl = weights.getSlice('depthwise_conv2d_6/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const depthwise_conv2d_3_Bias = (() => {
+    const sl = weights.getSlice('depthwise_conv2d_3/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32] }, new Float32Array(buf));
+  })();
+  const depthwise_conv2d_22_Bias = (() => {
+    const sl = weights.getSlice('depthwise_conv2d_22/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const depthwise_conv2d_1_Bias = (() => {
+    const sl = weights.getSlice('depthwise_conv2d_1/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16] }, new Float32Array(buf));
+  })();
+  const conv2d_9_Bias = (() => {
+    const sl = weights.getSlice('conv2d_9/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const conv2d_8_Bias = (() => {
+    const sl = weights.getSlice('conv2d_8/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const conv2d_7_Bias = (() => {
+    const sl = weights.getSlice('conv2d_7/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const conv2d_6_Bias = (() => {
+    const sl = weights.getSlice('conv2d_6/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const conv2d_5_Bias = (() => {
+    const sl = weights.getSlice('conv2d_5/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32] }, new Float32Array(buf));
+  })();
+  const conv2d_4_Bias = (() => {
+    const sl = weights.getSlice('conv2d_4/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32] }, new Float32Array(buf));
+  })();
+  const conv2d_30_Bias = (() => {
+    const sl = weights.getSlice('conv2d_30/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1] }, new Float32Array(buf));
+  })();
+  const conv2d_3_Bias = (() => {
+    const sl = weights.getSlice('conv2d_3/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32] }, new Float32Array(buf));
+  })();
+  const conv2d_29_Bias = (() => {
+    const sl = weights.getSlice('conv2d_29/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32] }, new Float32Array(buf));
+  })();
+  const conv2d_28_Bias = (() => {
+    const sl = weights.getSlice('conv2d_28/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32] }, new Float32Array(buf));
+  })();
+  const conv2d_27_Bias = (() => {
+    const sl = weights.getSlice('conv2d_27/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const conv2d_20_Bias = (() => {
+    const sl = weights.getSlice('conv2d_20/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1404] }, new Float32Array(buf));
+  })();
+  const conv2d_2_Bias = (() => {
+    const sl = weights.getSlice('conv2d_2/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16] }, new Float32Array(buf));
+  })();
+  const conv2d_19_Bias = (() => {
+    const sl = weights.getSlice('conv2d_19/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32] }, new Float32Array(buf));
+  })();
+  const conv2d_18_Bias = (() => {
+    const sl = weights.getSlice('conv2d_18/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32] }, new Float32Array(buf));
+  })();
+  const conv2d_17_Bias = (() => {
+    const sl = weights.getSlice('conv2d_17/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const conv2d_16_Bias = (() => {
+    const sl = weights.getSlice('conv2d_16/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const conv2d_15_Bias = (() => {
+    const sl = weights.getSlice('conv2d_15/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const conv2d_14_Bias = (() => {
+    const sl = weights.getSlice('conv2d_14/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const conv2d_13_Bias = (() => {
+    const sl = weights.getSlice('conv2d_13/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const conv2d_12_Bias = (() => {
+    const sl = weights.getSlice('conv2d_12/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const conv2d_11_Bias = (() => {
+    const sl = weights.getSlice('conv2d_11/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const conv2d_10_Bias = (() => {
+    const sl = weights.getSlice('conv2d_10/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const conv2d_1_Bias = (() => {
+    const sl = weights.getSlice('conv2d_1/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16] }, new Float32Array(buf));
+  })();
+  const conv2d_Bias = (() => {
+    const sl = weights.getSlice('conv2d/Bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__999 = (() => {
+    const sl = weights.getSlice('const_fold_opt__999');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32,32,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__997 = (() => {
+    const sl = weights.getSlice('const_fold_opt__997');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32,32,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__996 = (() => {
+    const sl = weights.getSlice('const_fold_opt__996');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32,128,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__995 = (() => {
+    const sl = weights.getSlice('const_fold_opt__995');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32,1,3,3] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__992 = (() => {
+    const sl = weights.getSlice('const_fold_opt__992');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,64,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__991 = (() => {
+    const sl = weights.getSlice('const_fold_opt__991');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,32,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__989 = (() => {
+    const sl = weights.getSlice('const_fold_opt__989');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32,128,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__984 = (() => {
+    const sl = weights.getSlice('const_fold_opt__984');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,1,3,3] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__976 = (() => {
+    const sl = weights.getSlice('const_fold_opt__976');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,64,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__975 = (() => {
+    const sl = weights.getSlice('const_fold_opt__975');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,32,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__971 = (() => {
+    const sl = weights.getSlice('const_fold_opt__971');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16,16,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__961 = (() => {
+    const sl = weights.getSlice('const_fold_opt__961');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,32,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__957 = (() => {
+    const sl = weights.getSlice('const_fold_opt__957');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,128,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__954 = (() => {
+    const sl = weights.getSlice('const_fold_opt__954');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32,32,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__946 = (() => {
+    const sl = weights.getSlice('const_fold_opt__946');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,64,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1084 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1084');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,32,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1083 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1083');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16,1,3,3] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1081 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1081');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32,32,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1080 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1080');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,1,3,3] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1078 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1078');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,1,3,3] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1077 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1077');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,1,3,3] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1076 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1076');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16,3,3,3] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1073 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1073');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,1,3,3] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1072 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1072');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16,1,3,3] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1071 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1071');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,128,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1070 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1070');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16,16,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1069 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1069');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,1,3,3] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1068 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1068');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,128,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1067 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1067');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32,16,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1066 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1066');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32,1,3,3] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1065 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1065');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32,1,3,3] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1064 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1064');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,128,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1063 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1063');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32,1,3,3] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1061 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1061');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1404,32,3,3] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1058 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1058');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,32,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1056 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1056');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16,1,3,3] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1055 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1055');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,16,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1054 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1054');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,64,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1052 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1052');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,1,3,3] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1051 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1051');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,128,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1050 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1050');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,128,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1045 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1045');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,32,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1044 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1044');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,128,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1043 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1043');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,32,3,3] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1039 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1039');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,128,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1038 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1038');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,128,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1036 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1036');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,1,3,3] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1035 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1035');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32,1,3,3] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1033 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1033');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,32,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1032 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1032');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,1,3,3] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1031 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1031');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,64,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1030 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1030');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,16,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1029 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1029');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,16,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1028 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1028');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,1,3,3] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1027 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1027');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,128,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1023 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1023');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,128,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1022 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1022');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,128,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1020 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1020');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,128,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1019 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1019');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,128,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1017 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1017');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,64,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1014 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1014');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,128,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1013 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1013');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,32,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1011 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1011');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,128,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1010 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1010');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,128,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1008 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1008');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,128,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1006 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1006');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,128,1,1] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1001 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1001');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,1,3,3] }, new Float32Array(buf));
+  })();
+  const const_fold_opt__1000 = (() => {
+    const sl = weights.getSlice('const_fold_opt__1000');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,1,3,3] }, new Float32Array(buf));
+  })();
+
+  // Graph operations
+  // Transpose
+  const conv2d__536_0 = builder.transpose(input_1, { permutation: [0, 3, 1, 2] });
+  // Conv
+  const conv2d = builder.conv2d(conv2d__536_0, const_fold_opt__1076, { padding: [0, 1, 0, 1], strides: [2, 2], bias: conv2d_Bias });
+  // PRelu
+  const p_re_lu = builder.prelu(conv2d, const_fold_opt__1030);
+  // Conv
+  const depthwise_conv2d = builder.conv2d(p_re_lu, const_fold_opt__1056, { padding: [1, 1, 1, 1], groups: 16, bias: depthwise_conv2d_1_Bias });
+  // Conv
+  const conv2d_1 = builder.conv2d(depthwise_conv2d, const_fold_opt__1070, { bias: conv2d_1_Bias });
+  // Add
+  const add = builder.add(p_re_lu, conv2d_1);
+  // PRelu
+  const p_re_lu_1 = builder.prelu(add, const_fold_opt__1055);
+  // Conv
+  const depthwise_conv2d_1 = builder.conv2d(p_re_lu_1, const_fold_opt__1083, { padding: [1, 1, 1, 1], groups: 16, bias: depthwise_conv2d_1_Bias });
+  // Conv
+  const conv2d_2 = builder.conv2d(depthwise_conv2d_1, const_fold_opt__971, { bias: conv2d_2_Bias });
+  // Add
+  const add_1 = builder.add(p_re_lu_1, conv2d_2);
+  // PRelu
+  const p_re_lu_2 = builder.prelu(add_1, const_fold_opt__1029);
+  // MaxPool
+  const max_pooling2d = builder.maxPool2d(p_re_lu_2, { windowDimensions: [2, 2], strides: [2, 2] });
+  // Pad
+  const channel_padding = builder.pad(max_pooling2d, [0,0,0,0], [0,16,0,0]);
+  // Conv
+  const depthwise_conv2d_2 = builder.conv2d(p_re_lu_2, const_fold_opt__1072, { padding: [0, 1, 0, 1], strides: [2, 2], groups: 16, bias: depthwise_conv2d_1_Bias });
+  // Conv
+  const conv2d_3 = builder.conv2d(depthwise_conv2d_2, const_fold_opt__1067, { bias: conv2d_3_Bias });
+  // Add
+  const add_2 = builder.add(channel_padding, conv2d_3);
+  // PRelu
+  const p_re_lu_3 = builder.prelu(add_2, const_fold_opt__1058);
+  // Conv
+  const depthwise_conv2d_3 = builder.conv2d(p_re_lu_3, const_fold_opt__1035, { padding: [1, 1, 1, 1], groups: 32, bias: depthwise_conv2d_3_Bias });
+  // Conv
+  const conv2d_4 = builder.conv2d(depthwise_conv2d_3, const_fold_opt__997, { bias: conv2d_4_Bias });
+  // Add
+  const add_3 = builder.add(p_re_lu_3, conv2d_4);
+  // PRelu
+  const p_re_lu_4 = builder.prelu(add_3, const_fold_opt__991);
+  // Conv
+  const depthwise_conv2d_4 = builder.conv2d(p_re_lu_4, const_fold_opt__995, { padding: [1, 1, 1, 1], groups: 32, bias: depthwise_conv2d_3_Bias });
+  // Conv
+  const conv2d_5 = builder.conv2d(depthwise_conv2d_4, const_fold_opt__954, { bias: conv2d_5_Bias });
+  // Add
+  const add_4 = builder.add(p_re_lu_4, conv2d_5);
+  // PRelu
+  const p_re_lu_5 = builder.prelu(add_4, const_fold_opt__961);
+  // MaxPool
+  const max_pooling2d_1 = builder.maxPool2d(p_re_lu_5, { windowDimensions: [2, 2], strides: [2, 2] });
+  // Pad
+  const channel_padding_1 = builder.pad(max_pooling2d_1, [0,0,0,0], [0,32,0,0]);
+  // Conv
+  const depthwise_conv2d_5 = builder.conv2d(p_re_lu_5, const_fold_opt__1065, { padding: [0, 1, 0, 1], strides: [2, 2], groups: 32, bias: depthwise_conv2d_3_Bias });
+  // Conv
+  const conv2d_6 = builder.conv2d(depthwise_conv2d_5, const_fold_opt__1033, { bias: conv2d_6_Bias });
+  // Add
+  const add_5 = builder.add(channel_padding_1, conv2d_6);
+  // PRelu
+  const p_re_lu_6 = builder.prelu(add_5, const_fold_opt__946);
+  // Conv
+  const depthwise_conv2d_6 = builder.conv2d(p_re_lu_6, const_fold_opt__1032, { padding: [1, 1, 1, 1], groups: 64, bias: depthwise_conv2d_6_Bias });
+  // Conv
+  const conv2d_7 = builder.conv2d(depthwise_conv2d_6, const_fold_opt__1031, { bias: conv2d_7_Bias });
+  // Add
+  const add_6 = builder.add(p_re_lu_6, conv2d_7);
+  // PRelu
+  const p_re_lu_7 = builder.prelu(add_6, const_fold_opt__976);
+  // Conv
+  const depthwise_conv2d_7 = builder.conv2d(p_re_lu_7, const_fold_opt__1078, { padding: [1, 1, 1, 1], groups: 64, bias: depthwise_conv2d_6_Bias });
+  // Conv
+  const conv2d_8 = builder.conv2d(depthwise_conv2d_7, const_fold_opt__1017, { bias: conv2d_8_Bias });
+  // Add
+  const add_7 = builder.add(p_re_lu_7, conv2d_8);
+  // PRelu
+  const p_re_lu_8 = builder.prelu(add_7, const_fold_opt__992);
+  // MaxPool
+  const max_pooling2d_2 = builder.maxPool2d(p_re_lu_8, { windowDimensions: [2, 2], strides: [2, 2] });
+  // Pad
+  const channel_padding_2 = builder.pad(max_pooling2d_2, [0,0,0,0], [0,64,0,0]);
+  // Conv
+  const depthwise_conv2d_8 = builder.conv2d(p_re_lu_8, const_fold_opt__1000, { padding: [0, 1, 0, 1], strides: [2, 2], groups: 64, bias: depthwise_conv2d_6_Bias });
+  // Conv
+  const conv2d_9 = builder.conv2d(depthwise_conv2d_8, const_fold_opt__1054, { bias: conv2d_9_Bias });
+  // Add
+  const add_8 = builder.add(channel_padding_2, conv2d_9);
+  // PRelu
+  const p_re_lu_9 = builder.prelu(add_8, const_fold_opt__1044);
+  // Conv
+  const depthwise_conv2d_9 = builder.conv2d(p_re_lu_9, const_fold_opt__1036, { padding: [1, 1, 1, 1], groups: 128, bias: depthwise_conv2d_22_Bias });
+  // Conv
+  const conv2d_10 = builder.conv2d(depthwise_conv2d_9, const_fold_opt__1006, { bias: conv2d_10_Bias });
+  // Add
+  const add_9 = builder.add(p_re_lu_9, conv2d_10);
+  // PRelu
+  const p_re_lu_10 = builder.prelu(add_9, const_fold_opt__1064);
+  // Conv
+  const depthwise_conv2d_10 = builder.conv2d(p_re_lu_10, const_fold_opt__1052, { padding: [1, 1, 1, 1], groups: 128, bias: depthwise_conv2d_22_Bias });
+  // Conv
+  const conv2d_11 = builder.conv2d(depthwise_conv2d_10, const_fold_opt__1010, { bias: conv2d_11_Bias });
+  // Add
+  const add_10 = builder.add(p_re_lu_10, conv2d_11);
+  // PRelu
+  const p_re_lu_11 = builder.prelu(add_10, const_fold_opt__1011);
+  // MaxPool
+  const max_pooling2d_3 = builder.maxPool2d(p_re_lu_11, { windowDimensions: [2, 2], strides: [2, 2] });
+  // Conv
+  const depthwise_conv2d_11 = builder.conv2d(p_re_lu_11, const_fold_opt__1028, { padding: [0, 1, 0, 1], strides: [2, 2], groups: 128, bias: depthwise_conv2d_22_Bias });
+  // Conv
+  const conv2d_12 = builder.conv2d(depthwise_conv2d_11, const_fold_opt__1050, { bias: conv2d_12_Bias });
+  // Add
+  const add_11 = builder.add(max_pooling2d_3, conv2d_12);
+  // PRelu
+  const p_re_lu_12 = builder.prelu(add_11, const_fold_opt__1068);
+  // Conv
+  const depthwise_conv2d_12 = builder.conv2d(p_re_lu_12, const_fold_opt__1077, { padding: [1, 1, 1, 1], groups: 128, bias: depthwise_conv2d_22_Bias });
+  // Conv
+  const conv2d_13 = builder.conv2d(depthwise_conv2d_12, const_fold_opt__1019, { bias: conv2d_13_Bias });
+  // Add
+  const add_12 = builder.add(p_re_lu_12, conv2d_13);
+  // PRelu
+  const p_re_lu_13 = builder.prelu(add_12, const_fold_opt__1008);
+  // Conv
+  const depthwise_conv2d_13 = builder.conv2d(p_re_lu_13, const_fold_opt__984, { padding: [1, 1, 1, 1], groups: 128, bias: depthwise_conv2d_22_Bias });
+  // Conv
+  const conv2d_14 = builder.conv2d(depthwise_conv2d_13, const_fold_opt__1051, { bias: conv2d_14_Bias });
+  // Add
+  const add_13 = builder.add(p_re_lu_13, conv2d_14);
+  // PRelu
+  const p_re_lu_14 = builder.prelu(add_13, const_fold_opt__1022);
+  // MaxPool
+  const max_pooling2d_6 = builder.maxPool2d(p_re_lu_14, { windowDimensions: [2, 2], strides: [2, 2] });
+  // Conv
+  const depthwise_conv2d_22 = builder.conv2d(p_re_lu_14, const_fold_opt__1001, { padding: [0, 1, 0, 1], strides: [2, 2], groups: 128, bias: depthwise_conv2d_22_Bias });
+  // Conv
+  const conv2d_27 = builder.conv2d(depthwise_conv2d_22, const_fold_opt__1023, { bias: conv2d_27_Bias });
+  // Add
+  const add_22 = builder.add(max_pooling2d_6, conv2d_27);
+  // PRelu
+  const p_re_lu_25 = builder.prelu(add_22, const_fold_opt__1071);
+  // Conv
+  const conv2d_28 = builder.conv2d(p_re_lu_25, const_fold_opt__996, { bias: conv2d_28_Bias });
+  // PRelu
+  const p_re_lu_26 = builder.prelu(conv2d_28, const_fold_opt__1013);
+  // Conv
+  const depthwise_conv2d_23 = builder.conv2d(p_re_lu_26, const_fold_opt__1063, { padding: [1, 1, 1, 1], groups: 32, bias: depthwise_conv2d_3_Bias });
+  // Conv
+  const conv2d_29 = builder.conv2d(depthwise_conv2d_23, const_fold_opt__1081, { bias: conv2d_29_Bias });
+  // Add
+  const add_23 = builder.add(p_re_lu_26, conv2d_29);
+  // PRelu
+  const p_re_lu_27 = builder.prelu(add_23, const_fold_opt__1084);
+  // Conv
+  const conv2d_30_raw_output___489_0 = builder.conv2d(p_re_lu_27, const_fold_opt__1043, { strides: [3, 3], bias: conv2d_30_Bias });
+  // Reshape
+  const conv2d_30 = builder.reshape(conv2d_30_raw_output___489_0, [1, 1, 1, 1]);
+  // Conv
+  const depthwise_conv2d_14 = builder.conv2d(p_re_lu_14, const_fold_opt__1069, { padding: [0, 1, 0, 1], strides: [2, 2], groups: 128, bias: depthwise_conv2d_22_Bias });
+  // Conv
+  const conv2d_15 = builder.conv2d(depthwise_conv2d_14, const_fold_opt__1027, { bias: conv2d_15_Bias });
+  // Add
+  const add_14 = builder.add(max_pooling2d_6, conv2d_15);
+  // PRelu
+  const p_re_lu_15 = builder.prelu(add_14, const_fold_opt__1020);
+  // Conv
+  const depthwise_conv2d_15 = builder.conv2d(p_re_lu_15, const_fold_opt__1080, { padding: [1, 1, 1, 1], groups: 128, bias: depthwise_conv2d_22_Bias });
+  // Conv
+  const conv2d_16 = builder.conv2d(depthwise_conv2d_15, const_fold_opt__1039, { bias: conv2d_16_Bias });
+  // Add
+  const add_15 = builder.add(p_re_lu_15, conv2d_16);
+  // PRelu
+  const p_re_lu_16 = builder.prelu(add_15, const_fold_opt__1014);
+  // Conv
+  const depthwise_conv2d_16 = builder.conv2d(p_re_lu_16, const_fold_opt__1073, { padding: [1, 1, 1, 1], groups: 128, bias: depthwise_conv2d_22_Bias });
+  // Conv
+  const conv2d_17 = builder.conv2d(depthwise_conv2d_16, const_fold_opt__957, { bias: conv2d_17_Bias });
+  // Add
+  const add_16 = builder.add(p_re_lu_16, conv2d_17);
+  // PRelu
+  const p_re_lu_17 = builder.prelu(add_16, const_fold_opt__1038);
+  // Conv
+  const conv2d_18 = builder.conv2d(p_re_lu_17, const_fold_opt__989, { bias: conv2d_18_Bias });
+  // PRelu
+  const p_re_lu_18 = builder.prelu(conv2d_18, const_fold_opt__1045);
+  // Conv
+  const depthwise_conv2d_17 = builder.conv2d(p_re_lu_18, const_fold_opt__1066, { padding: [1, 1, 1, 1], groups: 32, bias: depthwise_conv2d_3_Bias });
+  // Conv
+  const conv2d_19 = builder.conv2d(depthwise_conv2d_17, const_fold_opt__999, { bias: conv2d_19_Bias });
+  // Add
+  const add_17 = builder.add(p_re_lu_18, conv2d_19);
+  // PRelu
+  const p_re_lu_19 = builder.prelu(add_17, const_fold_opt__975);
+  // Conv
+  const conv2d_20_raw_output___487_0 = builder.conv2d(p_re_lu_19, const_fold_opt__1061, { strides: [3, 3], bias: conv2d_20_Bias });
+  // Reshape
+  const conv2d_20 = builder.reshape(conv2d_20_raw_output___487_0, [1, 1, 1, 1404]);
+
+  // Build graph
+  const namedOutputs = {};
+  namedOutputs['conv2d_20'] = conv2d_20;
+  namedOutputs['conv2d_30'] = conv2d_30;
+  // Capture actual output operand shapes (may differ from metadata for dynamic models)
+  const outputShapes = {};
+  for (const [name, operand] of Object.entries(namedOutputs)) {
+    outputShapes[name] = Array.from(operand.shape);
+  }
+  return { graph: await builder.build(namedOutputs), outputShapes };
+}
+
+async function main(deviceType = 'cpu') {
+  if (!navigator.ml) throw new Error('WebNN is not supported in this browser.');
+  const context = await navigator.ml.createContext({ deviceType });
+  const weights = await WeightsFile.load('face_landmark.weights', 'face_landmark.manifest.json');
+  const buildStart = performance.now();
+  const graph = await buildGraph(context, weights);
+  console.log(`Graph build: ${(performance.now() - buildStart).toFixed(2)}ms on ${deviceType.toUpperCase()}`)
+
+  // Create input tensors
+  const inputData_input_1 = new Float32Array(110592); // [1,192,192,3]
+  const inputTensor_input_1 = await context.createTensor({ dataType: 'float32', shape: [1,192,192,3], writable: true });
+  context.writeTensor(inputTensor_input_1, inputData_input_1);
+
+  // Create output tensors — use actual shapes from built graph
+  const outputTensor_conv2d_20 = await context.createTensor({ dataType: 'float32', shape: graph.outputShapes['conv2d_20'], readable: true });
+  const outputTensor_conv2d_30 = await context.createTensor({ dataType: 'float32', shape: graph.outputShapes['conv2d_30'], readable: true });
+
+  const inputs = {
+    'input_1': inputTensor_input_1,
+  };
+  const outputs = {
+    'conv2d_20': outputTensor_conv2d_20,
+    'conv2d_30': outputTensor_conv2d_30,
+  };
+
+  const start = performance.now();
+  context.dispatch(graph.graph, inputs, outputs);
+
+  // Read results
+  const result_conv2d_20 = new Float32Array(await context.readTensor(outputTensor_conv2d_20));
+  const result_conv2d_30 = new Float32Array(await context.readTensor(outputTensor_conv2d_30));
+  console.log(`Inference: ${(performance.now() - start).toFixed(2)}ms (1 run) on ${deviceType.toUpperCase()}`)
+
+  // Benchmark: 50 runs
+  const NUM_RUNS = 50;
+  const runTimes = [];
+  for (let i = 0; i < NUM_RUNS; i++) {
+    const t0 = performance.now();
+    context.dispatch(graph.graph, inputs, outputs);
+    new Float32Array(await context.readTensor(outputTensor_conv2d_20));
+    new Float32Array(await context.readTensor(outputTensor_conv2d_30));
+    runTimes.push(performance.now() - t0);
+  }
+  const avgTime = (runTimes.reduce((a, b) => a + b, 0) / NUM_RUNS).toFixed(2);
+  const sorted = [...runTimes].sort((a, b) => a - b);
+  const medianTime = (NUM_RUNS % 2 ? sorted[NUM_RUNS >> 1] : (sorted[NUM_RUNS / 2 - 1] + sorted[NUM_RUNS / 2]) / 2).toFixed(2);
+  console.log(`Inference: ${avgTime}ms (average \u00b7 ${NUM_RUNS} runs) on ${deviceType.toUpperCase()}`)
+  console.log(`Inference: ${medianTime}ms (median \u00b7 ${NUM_RUNS} runs) on ${deviceType.toUpperCase()}`)
+
+  return { 'conv2d_20': result_conv2d_20, 'conv2d_30': result_conv2d_30 };
+}

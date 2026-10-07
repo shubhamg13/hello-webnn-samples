@@ -1,0 +1,1566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Virtual Try-On — WebNN</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #1a1a2e; color: #e0e0e0; padding: 1rem;
+      min-height: 100vh;
+    }
+    .container { max-width: 1300px; margin: 0 auto; }
+    h1 { font-size: 1.3rem; margin-bottom: 0.2rem; color: #fff; }
+    .subtitle { color: #888; font-size: 0.8rem; margin-bottom: 0.75rem; }
+
+    .card {
+      background: #16213e; border-radius: 8px; padding: 0.75rem 1rem;
+      margin-bottom: 0.6rem; border: 1px solid #0f3460;
+    }
+    .controls {
+      display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;
+    }
+    label { font-weight: 600; font-size: 0.8rem; color: #aaa; white-space: nowrap; }
+    select, button, input[type="color"] {
+      padding: 0.35rem 0.6rem; border: 1px solid #0f3460;
+      border-radius: 4px; font-size: 0.8rem; cursor: pointer;
+      background: #0f3460; color: #e0e0e0;
+    }
+    input[type="color"] {
+      width: 36px; height: 30px; padding: 2px;
+    }
+    button {
+      background: #e94560; color: #fff; border: none;
+      font-weight: 500; white-space: nowrap;
+    }
+    button:hover { background: #c73a54; }
+    button:disabled { background: #333; color: #666; cursor: not-allowed; }
+    button.playing { background: #2196F3; }
+
+    .status {
+      padding: 0.4rem 0.75rem; font-size: 0.8rem; border-radius: 4px;
+      margin-bottom: 0.5rem;
+    }
+    .status.info { background: #0f3460; border-left: 3px solid #2196F3; }
+    .status.success { background: #1a3a1a; border-left: 3px solid #4CAF50; }
+    .status.error { background: #3a1a1a; border-left: 3px solid #f44336; }
+
+    .workspace {
+      display: flex; gap: 0.75rem; flex-wrap: wrap;
+    }
+    .panel {
+      flex: 1; min-width: 320px; display: flex;
+      flex-direction: column; align-items: center;
+    }
+    .panel-label {
+      font-size: 0.75rem; color: #888; margin-bottom: 0.3rem;
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+    video, canvas {
+      width: 100%; max-height: 60vh; border-radius: 4px;
+      border: 1px solid #0f3460; background: #000; display: block;
+    }
+    #outputCanvas { cursor: crosshair; }
+
+    .color-row {
+      display: flex; align-items: center; gap: 0.4rem;
+    }
+    .color-preview {
+      width: 24px; height: 24px; border-radius: 50%;
+      border: 2px solid #444;
+    }
+
+    #uploadArea {
+      border: 2px dashed #0f3460; border-radius: 8px;
+      padding: 1.5rem; text-align: center; cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    #uploadArea:hover { border-color: #e94560; }
+    #uploadArea.has-video { display: none; }
+
+    input[type="file"] { display: none; }
+
+    .fps-display {
+      font-size: 0.7rem; color: #666;
+      font-family: monospace; margin-top: 0.2rem;
+    }
+    .frame-count-log {
+      margin-top: 0.5rem; padding: 0.5rem 0.75rem;
+      background: #0f1a2e; border: 1px solid #0f3460;
+      border-radius: 4px; max-height: 200px; overflow-y: auto;
+      font-family: monospace; font-size: 0.75rem; color: #aaa;
+      width: 100%;
+    }
+    .frame-count-log .header {
+      color: #e94560; font-weight: 600; margin-bottom: 0.3rem;
+      display: flex; justify-content: space-between;
+    }
+    .frame-count-log .entry {
+      display: flex; justify-content: space-between;
+      padding: 0.15rem 0; border-bottom: 1px solid #0f3460;
+    }
+    .frame-count-log .entry .minute { color: #2196F3; }
+    .frame-count-log .entry .count { color: #4CAF50; font-weight: 600; }
+    .frame-count-log .current-minute {
+      color: #e94560; font-weight: 600; margin-top: 0.3rem;
+      padding-top: 0.3rem; border-top: 1px solid #e94560;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Virtual Try-On (Lipstick)</h1>
+    <p class="subtitle">Upload a video, then process frames with WebNN face detection + landmark for lip recoloring</p>
+
+    <div id="uploadArea" onclick="document.getElementById('videoInput').click()">
+      <p style="color:#888;">Click or drag to upload a video file</p>
+      <p style="font-size:0.7rem;color:#555;">.mp4, .webm, .mov</p>
+    </div>
+    <input type="file" id="videoInput" >
+
+    <div class="card">
+      <div class="controls">
+        <label for="deviceSelect">Device:</label>
+        <select id="deviceSelect">
+          <option value="cpu">CPU</option>
+          <option value="gpu">GPU</option>
+          <option value="npu">NPU</option>
+        </select>
+        <span style="color:#555;">|</span>
+        <label for="detectorSelect">Detector:</label>
+        <select id="detectorSelect" style="width:auto;">
+          <option value="ssd">SSD v1 (128×128)</option>
+          <option value="yolo">YOLOv8n-Face (640×640)</option>
+        </select>
+        <span style="color:#555;">|</span>
+        <label for="lipColor">Lip Color:</label>
+        <input type="color" id="lipColor" value="#e94560">
+        <span id="colorPreview" class="color-preview" style="background:#e94560;"></span>
+        <span style="color:#555;">|</span>
+        <button id="processBtn" onclick="processFrameWrapper()" disabled>Process Frame</button>
+        <button id="videoPlayBtn" onclick="toggleVideoPlay()" disabled>▶ Play</button>
+        <button id="autoProcessBtn" onclick="toggleAutoProcess()" disabled>Auto Process</button>
+        <label><input type="checkbox" id="dflGraphCheck" checked> DFL Graph</label>
+        <label><input type="checkbox" id="debugCheck"> Debug</label>
+        <span style="color:#555;">|</span>
+        <label><input type="number" id="framePerMinute" value="60" min="1" style="width:60px;"> frames/min <button id="updateFramePerMinuteBtn" onclick="updateFramePerMinuteConstraint()">Update</button></label>
+
+        <button id="downloadBtn" onclick="downloadFrame()" disabled>💾 Download</button>
+        <span style="color:#555;">|</span>
+        <button id="frameCountBtn" onclick="toggleFrameCount()" disabled>⏱ Start Frame Count</button>
+      </div>
+    </div>
+
+    <div id="status" class="status info">Upload a video to begin. Models will load on first processing.</div>
+
+    <div class="workspace">
+      <div class="panel">
+        <div class="panel-label">Original Video</div>
+        <video id="video" crossorigin="anonymous" playsinline loop muted preload="metadata"></video>
+      </div>
+      <div class="panel">
+        <div class="panel-label">Processed Output</div>
+        <canvas id="outputCanvas"></canvas>
+        <div class="fps-display" id="fpsDisplay"></div>
+        <div class="frame-count-log" id="frameCountLog" style="display:none;">
+          <div class="header"><span>⏱ Minute Period</span><span>Frames</span></div>
+          <div id="frameCountEntries"></div>
+          <div class="current-minute" id="currentMinuteDisplay" style="display:none;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Load face_landmark.js first (defines WeightsFile + buildGraph for landmark)
+  </script>
+  <script src="../face_landmark-webnn/face_landmark.js"></script>
+  <script>
+    const buildLandmarkGraph = buildGraph;
+    const LandmarkWeightsFile = WeightsFile;
+  </script>
+  <!-- YOLOv8n-Face graph builder (stripped of WeightsFile) -->
+  <script src="../yolov8n-face-webnn/yolov8n-face-graph.js"></script>
+  <script>
+    const buildYoloFaceGraph = buildGraph;
+    const buildYoloFaceDFLGraph = buildDFLGraph;
+  </script>
+  <!-- YOLO detector pipeline module -->
+  <script src="../webnn_face_detection/yolo_detector.js"></script>
+  <script>
+    // Face detector graph builder — reuses WeightsFile from face_landmark.js
+    async function buildDetectorGraph(context, weights) {
+      const builder = new MLGraphBuilder(context);
+      const input = builder.input('input', { dataType: 'float32', shape: [1,128,128,3] });
+
+      function c(name, shape) {
+        const sl = weights.getSlice(name);
+        const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+        return builder.constant({ dataType: 'float32', shape }, new Float32Array(buf));
+      }
+
+      const w408 = c('const_fold_opt__408', [24,3,5,5]);
+      const w440 = c('const_fold_opt__440', [24]);
+      const w479 = c('const_fold_opt__479', [24,1,3,3]);
+      const w398 = c('const_fold_opt__398', [24]);
+      const w397 = c('const_fold_opt__397', [24,24,1,1]);
+      const w381 = c('const_fold_opt__381', [24]);
+      const w483 = c('const_fold_opt__483', [24,1,3,3]);
+      const w471 = c('const_fold_opt__471', [28,24,1,1]);
+      const w330 = c('const_fold_opt__330', [28]);
+      const w430 = c('const_fold_opt__430', [28,1,3,3]);
+      const w366 = c('const_fold_opt__366', [28]);
+      const w478 = c('const_fold_opt__478', [32,28,1,1]);
+      const w347 = c('const_fold_opt__347', [32]);
+      const w447 = c('const_fold_opt__447', [32,1,3,3]);
+      const w468 = c('const_fold_opt__468', [32]);
+      const w409 = c('const_fold_opt__409', [36,32,1,1]);
+      const w385 = c('const_fold_opt__385', [36]);
+      const w458 = c('const_fold_opt__458', [36,1,3,3]);
+      const w378 = c('const_fold_opt__378', [36]);
+      const w467 = c('const_fold_opt__467', [42,36,1,1]);
+      const w322 = c('const_fold_opt__322', [42]);
+      const w451 = c('const_fold_opt__451', [42,1,3,3]);
+      const w337 = c('const_fold_opt__337', [42]);
+      const w466 = c('const_fold_opt__466', [48,1,3,3]);
+      const w329 = c('const_fold_opt__329', [48]);
+      const w415 = c('const_fold_opt__415', [48,42,1,1]);
+      const w319 = c('const_fold_opt__319', [48]);
+      const w473 = c('const_fold_opt__473', [56,1,3,3]);
+      const w357 = c('const_fold_opt__357', [56]);
+      const w452 = c('const_fold_opt__452', [56,48,1,1]);
+      const w379 = c('const_fold_opt__379', [56]);
+      const w423 = c('const_fold_opt__423', [64,56,1,1]);
+      const w399 = c('const_fold_opt__399', [64]);
+      const w449 = c('const_fold_opt__449', [64,1,3,3]);
+      const w320 = c('const_fold_opt__320', [64]);
+      const w456 = c('const_fold_opt__456', [72,64,1,1]);
+      const w333 = c('const_fold_opt__333', [72]);
+      const w459 = c('const_fold_opt__459', [72,1,3,3]);
+      const w352 = c('const_fold_opt__352', [72]);
+      const w457 = c('const_fold_opt__457', [80,72,1,1]);
+      const w344 = c('const_fold_opt__344', [80]);
+      const w485 = c('const_fold_opt__485', [80,1,3,3]);
+      const w321 = c('const_fold_opt__321', [80]);
+      const w472 = c('const_fold_opt__472', [88,1,3,3]);
+      const w341 = c('const_fold_opt__341', [88]);
+      const w437 = c('const_fold_opt__437', [88,80,1,1]);
+      const w343 = c('const_fold_opt__343', [88]);
+      const w484 = c('const_fold_opt__484', [32,88,1,1]);
+      const w443 = c('const_fold_opt__443', [32]);
+      const w441 = c('const_fold_opt__441', [96,88,1,1]);
+      const w339 = c('const_fold_opt__339', [96]);
+      const w450 = c('const_fold_opt__450', [96,1,3,3]);
+      const w356 = c('const_fold_opt__356', [96]);
+      const w403 = c('const_fold_opt__403', [96,96,1,1]);
+      const w373 = c('const_fold_opt__373', [96]);
+      const w486 = c('const_fold_opt__486', [96,1,3,3]);
+      const w413 = c('const_fold_opt__413', [96,96,1,1]);
+      const w391 = c('const_fold_opt__391', [96]);
+      const w455 = c('const_fold_opt__455', [96,1,3,3]);
+      const w407 = c('const_fold_opt__407', [96,96,1,1]);
+      const w477 = c('const_fold_opt__477', [96]);
+      const w470 = c('const_fold_opt__470', [96,1,3,3]);
+      const w444 = c('const_fold_opt__444', [96,96,1,1]);
+      const w368 = c('const_fold_opt__368', [96]);
+      const w475 = c('const_fold_opt__475', [96,96,1,1]);
+      const w328 = c('const_fold_opt__328', [96]);
+      const w469 = c('const_fold_opt__469', [2,88,1,1]);
+      const w327 = c('const_fold_opt__327', [2]);
+      const w411 = c('const_fold_opt__411', [6,96,1,1]);
+      const w380 = c('const_fold_opt__380', [6]);
+
+      const t0 = builder.transpose(input, { permutation: [0, 3, 1, 2] });
+      const c0 = builder.conv2d(t0, w408, { padding: [1, 2, 1, 2], strides: [2, 2], bias: w440 });
+      const a0 = builder.relu(c0);
+      const d0 = builder.conv2d(a0, w479, { padding: [1, 1, 1, 1], groups: 24, bias: w398 });
+      const c1 = builder.conv2d(d0, w397, { bias: w381 });
+      const ad0 = builder.add(a0, c1);
+      const a1 = builder.relu(ad0);
+      const d1 = builder.conv2d(a1, w483, { padding: [1, 1, 1, 1], groups: 24, bias: w398 });
+      const c2 = builder.conv2d(d1, w471, { bias: w330 });
+      const pad0 = builder.pad(a1, [0,0,0,0], [0,4,0,0]);
+      const ad1 = builder.add(pad0, c2);
+      const a2 = builder.relu(ad1);
+      const mp0 = builder.maxPool2d(a2, { windowDimensions: [2, 2], strides: [2, 2] });
+      const pad1 = builder.pad(mp0, [0,0,0,0], [0,4,0,0]);
+      const d2 = builder.conv2d(a2, w430, { padding: [0, 1, 0, 1], strides: [2, 2], groups: 28, bias: w366 });
+      const c3 = builder.conv2d(d2, w478, { bias: w347 });
+      const ad2 = builder.add(pad1, c3);
+      const a3 = builder.relu(ad2);
+      const d3 = builder.conv2d(a3, w447, { padding: [1, 1, 1, 1], groups: 32, bias: w468 });
+      const c4 = builder.conv2d(d3, w409, { bias: w385 });
+      const pad2 = builder.pad(a3, [0,0,0,0], [0,4,0,0]);
+      const ad3 = builder.add(pad2, c4);
+      const a4 = builder.relu(ad3);
+      const d4 = builder.conv2d(a4, w458, { padding: [1, 1, 1, 1], groups: 36, bias: w378 });
+      const c5 = builder.conv2d(d4, w467, { bias: w322 });
+      const pad3 = builder.pad(a4, [0,0,0,0], [0,6,0,0]);
+      const ad4 = builder.add(pad3, c5);
+      const a5 = builder.relu(ad4);
+      const mp1 = builder.maxPool2d(a5, { windowDimensions: [2, 2], strides: [2, 2] });
+      const pad4 = builder.pad(mp1, [0,0,0,0], [0,6,0,0]);
+      const d5 = builder.conv2d(a5, w451, { padding: [0, 1, 0, 1], strides: [2, 2], groups: 42, bias: w337 });
+      const c6 = builder.conv2d(d5, w415, { bias: w319 });
+      const ad5 = builder.add(pad4, c6);
+      const a6 = builder.relu(ad5);
+      const d6 = builder.conv2d(a6, w466, { padding: [1, 1, 1, 1], groups: 48, bias: w329 });
+      const c7 = builder.conv2d(d6, w452, { bias: w379 });
+      const pad5 = builder.pad(a6, [0,0,0,0], [0,8,0,0]);
+      const ad6 = builder.add(pad5, c7);
+      const a7 = builder.relu(ad6);
+      const d7 = builder.conv2d(a7, w473, { padding: [1, 1, 1, 1], groups: 56, bias: w357 });
+      const c8 = builder.conv2d(d7, w423, { bias: w399 });
+      const pad6 = builder.pad(a7, [0,0,0,0], [0,8,0,0]);
+      const ad7 = builder.add(pad6, c8);
+      const a8 = builder.relu(ad7);
+      const d8 = builder.conv2d(a8, w449, { padding: [1, 1, 1, 1], groups: 64, bias: w320 });
+      const c9 = builder.conv2d(d8, w456, { bias: w333 });
+      const pad7 = builder.pad(a8, [0,0,0,0], [0,8,0,0]);
+      const ad8 = builder.add(pad7, c9);
+      const a9 = builder.relu(ad8);
+      const d9 = builder.conv2d(a9, w459, { padding: [1, 1, 1, 1], groups: 72, bias: w352 });
+      const c10 = builder.conv2d(d9, w457, { bias: w344 });
+      const pad8 = builder.pad(a9, [0,0,0,0], [0,8,0,0]);
+      const ad9 = builder.add(pad8, c10);
+      const a10 = builder.relu(ad9);
+      const d10 = builder.conv2d(a10, w485, { padding: [1, 1, 1, 1], groups: 80, bias: w321 });
+      const c11 = builder.conv2d(d10, w437, { bias: w343 });
+      const pad9 = builder.pad(a10, [0,0,0,0], [0,8,0,0]);
+      const ad10 = builder.add(pad9, c11);
+      const a11 = builder.relu(ad10);
+
+      const r8 = builder.conv2d(a11, w484, { padding: [0, 0, 0, 0], bias: w443 });
+      const r8t = builder.transpose(r8, { permutation: [0, 2, 3, 1] });
+      const rs1 = builder.reshape(r8t, [1, 512, 16]);
+
+      const mp2 = builder.maxPool2d(a11, { windowDimensions: [2, 2], strides: [2, 2] });
+      const pad10 = builder.pad(mp2, [0,0,0,0], [0,8,0,0]);
+      const d11 = builder.conv2d(a11, w472, { padding: [0, 1, 0, 1], strides: [2, 2], groups: 88, bias: w341 });
+      const c12 = builder.conv2d(d11, w441, { bias: w339 });
+      const ad11 = builder.add(pad10, c12);
+      const a12 = builder.relu(ad11);
+      const d12 = builder.conv2d(a12, w450, { padding: [1, 1, 1, 1], groups: 96, bias: w356 });
+      const c13 = builder.conv2d(d12, w403, { bias: w373 });
+      const ad12 = builder.add(a12, c13);
+      const a13 = builder.relu(ad12);
+      const d13 = builder.conv2d(a13, w486, { padding: [1, 1, 1, 1], groups: 96, bias: w356 });
+      const c14 = builder.conv2d(d13, w413, { bias: w391 });
+      const ad13 = builder.add(a13, c14);
+      const a14 = builder.relu(ad13);
+      const d14 = builder.conv2d(a14, w455, { padding: [1, 1, 1, 1], groups: 96, bias: w356 });
+      const c15 = builder.conv2d(d14, w407, { bias: w477 });
+      const ad14 = builder.add(a14, c15);
+      const a15 = builder.relu(ad14);
+      const d15 = builder.conv2d(a15, w470, { padding: [1, 1, 1, 1], groups: 96, bias: w356 });
+      const c16 = builder.conv2d(d15, w444, { bias: w368 });
+      const ad15 = builder.add(a15, c16);
+      const a16 = builder.relu(ad15);
+
+      const r16 = builder.conv2d(a16, w475, { padding: [0, 0, 0, 0], bias: w328 });
+      const r16t = builder.transpose(r16, { permutation: [0, 2, 3, 1] });
+      const rs2 = builder.reshape(r16t, [1, 384, 16]);
+      const regressors = builder.concat([rs1, rs2], 1);
+
+      const cl16 = builder.conv2d(a16, w411, { padding: [0, 0, 0, 0], bias: w380 });
+      const cl16t = builder.transpose(cl16, { permutation: [0, 2, 3, 1] });
+      const rcl1 = builder.reshape(cl16t, [1, 384, 1]);
+      const cl8 = builder.conv2d(a11, w469, { padding: [0, 0, 0, 0], bias: w327 });
+      const cl8t = builder.transpose(cl8, { permutation: [0, 2, 3, 1] });
+      const rcl0 = builder.reshape(cl8t, [1, 512, 1]);
+      const classificators = builder.concat([rcl0, rcl1], 1);
+
+      const namedOutputs = { regressors, classificators };
+      const outputShapes = {};
+      for (const [name, operand] of Object.entries(namedOutputs)) {
+        outputShapes[name] = Array.from(operand.shape);
+      }
+      return { graph: await builder.build(namedOutputs), outputShapes };
+    }
+
+    // ============ CONSTANTS ============
+    const MIN_SCORE = 0.5;
+    const MIN_SUPPRESSION_THRESHOLD = 0.3;
+    const RAW_SCORE_LIMIT = 80;
+    const SSD_OPTIONS_SHORT = {
+      num_layers: 4, input_size_height: 128, input_size_width: 128,
+      anchor_offset_x: 0.5, anchor_offset_y: 0.5,
+      strides: [8, 16, 16, 16], interpolated_scale_aspect_ratio: 1.0
+    };
+    const FaceIndex = { LEFT_EYE: 0, RIGHT_EYE: 1, NOSE_TIP: 2, MOUTH: 3, LEFT_EYE_TRAGION: 4, RIGHT_EYE_TRAGION: 5 };
+    let ROI_SCALE = 1.5;  // 1.5 for SSD, 1.25 for YOLO
+    const LANDMARK_DETECTION_THRESHOLD = 0.5;
+    const LM_INPUT_SIZE = { width: 192, height: 192 };
+
+    // Lip landmark indices (MediaPipe 468-point face mesh)
+    const LIP_OUTER = [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185];
+    const LIP_INNER = [78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308, 415, 310, 311, 312, 13, 82, 81, 80, 191];
+
+    const MESH_CONNECTIONS = [
+      [61,146],[146,91],[91,181],[181,84],[84,17],[17,314],[314,405],[405,321],[321,375],[375,291],
+      [61,185],[185,40],[40,39],[39,37],[37,0],[0,267],[267,269],[269,270],[270,409],[409,291],
+      [78,95],[95,88],[88,178],[178,87],[87,14],[14,317],[317,402],[402,318],[318,324],[324,308],
+      [78,191],[191,80],[80,81],[81,82],[82,13],[13,312],[312,311],[311,310],[310,415],[415,308],
+      [33,7],[7,163],[163,144],[144,145],[145,153],[153,154],[154,155],[155,133],
+      [33,246],[246,161],[161,160],[160,159],[159,158],[158,157],[157,173],[173,133],
+      [46,53],[53,52],[52,65],[65,55],[70,63],[63,105],[105,66],[66,107],
+      [263,249],[249,390],[390,373],[373,374],[374,380],[380,381],[381,382],[382,362],
+      [263,466],[466,388],[388,387],[387,386],[386,385],[385,384],[384,398],[398,362],
+      [276,283],[283,282],[282,295],[295,285],[300,293],[293,334],[334,296],[296,336],
+      [10,338],[338,297],[297,332],[332,284],[284,251],[251,389],[389,356],[356,454],
+      [454,323],[323,361],[361,288],[288,397],[397,365],[365,379],[379,378],[378,400],
+      [400,377],[377,152],[152,148],[148,176],[176,149],[149,150],[150,136],[136,172],
+      [172,58],[58,132],[132,93],[93,234],[234,127],[127,162],[162,21],[21,54],[54,103],[103,67],[67,109],[109,10]
+    ];
+
+    // ============ GLOBALS ============
+    let mlContext = null;
+    let detectorGraph = null;
+    let detectorOutputShapes = null;
+    let detectorType = 'ssd';  // 'ssd' or 'yolo'
+    let deviceType = 'cpu';  // 'cpu', 'gpu', or 'npu'
+    // YOLO-specific globals
+    let yoloGraph = null;
+    let yoloOutputShapes = null;
+    let dflGraph = null;
+    let dflOutputShapes = null;
+    let landmarkGraph = null;
+    let landmarkOutputShapes = null;
+    let isProcessing = false;
+    let autoPlayActive = false;
+    let autoPlayRAF = null;
+    let frameCount = 0;
+    let lastFPSTime = 0;
+    // Per-minute frame counting
+    let frameCountActive = false;
+    let minuteFrameCount = 0;
+    let minuteStartTime = null;
+    let minuteFrameCountLimit = 1000;  // default frames per minute limit
+    let unblockTime = null;
+    let frameCountLog = [];  // [{ minute: "hh:mm", count: N }]
+    const MAX_DIM = 1280; // max processing resolution on longest side
+
+    // ============ CACHED TENSORS (reused across frames — created once, never reallocated) ============
+    // YOLO tensors
+    let cachedYoloInputTensor = null;       // [1,640,640,4] uint8 writable
+    let cachedYoloIntermTensors = null;     // { output0, cat_17, cat_18 } — float32 readable+writable (DFL path)
+    let cachedYoloOutTensors = null;        // { output0, cat_17, cat_18 } — float32 readable (non-DFL path)
+    let cachedDflOutTensors = null;         // { dfl0, dfl17, dfl18 } — float32 readable (DFL path)
+
+    // SSD tensors
+    let cachedSsdInputTensor = null;        // [1,128,128,3] float32 writable
+    let cachedSsdRegTensor = null;          // regressors output
+    let cachedSsdClsTensor = null;          // classificators output
+
+    // Landmark tensors (shared by both detector paths)
+    let cachedLmInputTensor = null;         // [1,192,192,3] float32 writable
+    let cachedLmOutTensor = null;           // conv2d_20 output
+    let cachedLmFlagTensor = null;          // conv2d_30 output
+
+    // ============ CACHED CANVASES (reused across frames) ============
+    let cachedFrameCanvas = null;
+    let cachedFrameCtx = null;
+    let cachedPreprocessCanvas = null;
+    let cachedPreprocessCtx = null;
+    let cachedRoiCropCanvas = null;
+    let cachedRoiCropCtx = null;
+
+    // ============ CACHED CPU BUFFERS (reused across frames) ============
+    const cachedSsdPreprocessBuffer = new Float32Array(128 * 128 * 3);
+    const cachedRoiCropBuffer = new Float32Array(192 * 192 * 3);
+
+    // ============ TENSOR LIFECYCLE HELPERS ============
+    async function ensureDetectorTensors() {
+      const isYolo = detectorType === 'yolo';
+      if (isYolo) {
+        if (!cachedYoloInputTensor) {
+          cachedYoloInputTensor = await mlContext.createTensor({
+            dataType: 'uint8', shape: [1, 640, 640, 4], writable: true
+          });
+        }
+        if (!cachedYoloOutTensors && yoloOutputShapes) {
+          cachedYoloOutTensors = {};
+          for (const name of ['output0', 'cat_17', 'cat_18']) {
+            cachedYoloOutTensors[name] = await mlContext.createTensor({
+              dataType: 'float32', shape: yoloOutputShapes[name], readable: true
+            });
+          }
+        }
+        if (!cachedYoloIntermTensors && yoloOutputShapes) {
+          cachedYoloIntermTensors = {};
+          for (const name of ['output0', 'cat_17', 'cat_18']) {
+            cachedYoloIntermTensors[name] = await mlContext.createTensor({
+              dataType: 'float32', shape: yoloOutputShapes[name],
+              readable: true, writable: true
+            });
+          }
+        }
+      } else {
+        if (!cachedSsdInputTensor) {
+          cachedSsdInputTensor = await mlContext.createTensor({
+            dataType: 'float32', shape: [1, 128, 128, 3], writable: true
+          });
+        }
+        if (!cachedSsdRegTensor && detectorOutputShapes) {
+          cachedSsdRegTensor = await mlContext.createTensor({
+            dataType: 'float32', shape: detectorOutputShapes['regressors'], readable: true
+          });
+        }
+        if (!cachedSsdClsTensor && detectorOutputShapes) {
+          cachedSsdClsTensor = await mlContext.createTensor({
+            dataType: 'float32', shape: detectorOutputShapes['classificators'], readable: true
+          });
+        }
+      }
+      // Landmark tensors — shared by both paths
+      if (!cachedLmInputTensor) {
+        cachedLmInputTensor = await mlContext.createTensor({
+          dataType: 'float32', shape: [1, 192, 192, 3], writable: true
+        });
+      }
+      if (!cachedLmOutTensor && landmarkOutputShapes) {
+        cachedLmOutTensor = await mlContext.createTensor({
+          dataType: 'float32', shape: landmarkOutputShapes['conv2d_20'], readable: true
+        });
+      }
+      if (!cachedLmFlagTensor && landmarkOutputShapes) {
+        cachedLmFlagTensor = await mlContext.createTensor({
+          dataType: 'float32', shape: landmarkOutputShapes['conv2d_30'], readable: true
+        });
+      }
+    }
+
+    async function ensureDflTensors() {
+      if (!cachedDflOutTensors && dflOutputShapes) {
+        cachedDflOutTensors = {};
+        for (const name of ['dfl0', 'dfl17', 'dfl18']) {
+          cachedDflOutTensors[name] = await mlContext.createTensor({
+            dataType: 'float32', shape: dflOutputShapes[name], readable: true
+          });
+        }
+      }
+    }
+
+    function resetCachedTensors() {
+      // Called when detector type changes — force recreation of all detector tensors
+      cachedYoloInputTensor = null;
+      cachedYoloIntermTensors = null;
+      cachedYoloOutTensors = null;
+      cachedDflOutTensors = null;
+      cachedSsdInputTensor = null;
+      cachedSsdRegTensor = null;
+      cachedSsdClsTensor = null;
+      cachedLmInputTensor = null;
+      cachedLmOutTensor = null;
+      cachedLmFlagTensor = null;
+    }
+
+    // ============ PREPROCESSING (face detector) ============
+    function preprocessForDetector(sourceCanvas) {
+      const sw = sourceCanvas.width;
+      const sh = sourceCanvas.height;
+      const tw = 128, th = 128;
+
+      const aspectRatio = sw / sh;
+      const targetAspectRatio = tw / th;
+      let scale, padX = 0, padY = 0, canvasWidth, canvasHeight;
+
+      if (aspectRatio < targetAspectRatio) {
+        scale = tw / sw;
+        canvasHeight = Math.round(sh * scale);
+        canvasWidth = tw;
+        padY = (th - canvasHeight) / 2 / th;
+      } else {
+        scale = th / sh;
+        canvasWidth = Math.round(sw * scale);
+        canvasHeight = th;
+        padX = (tw - canvasWidth) / 2 / tw;
+      }
+
+      // Reuse cached canvas (create on first use)
+      if (!cachedPreprocessCanvas) {
+        cachedPreprocessCanvas = document.createElement('canvas');
+        cachedPreprocessCtx = cachedPreprocessCanvas.getContext('2d');
+      }
+      const canvas = cachedPreprocessCanvas;
+      const ctx = cachedPreprocessCtx;
+      canvas.width = tw; canvas.height = th;
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, tw, th);
+      const dx = Math.round((tw - Math.round(canvasWidth)) / 2);
+      const dy = Math.round((th - Math.round(canvasHeight)) / 2);
+      ctx.drawImage(sourceCanvas, dx, dy, Math.round(canvasWidth), Math.round(canvasHeight));
+
+      const imageData = ctx.getImageData(0, 0, tw, th);
+      const data = imageData.data;
+      const tensor = cachedSsdPreprocessBuffer; // reuse pre-allocated buffer
+      for (let i = 0; i < th * tw; i++) {
+        const r = data[i * 4] / 255;
+        const g = data[i * 4 + 1] / 255;
+        const b = data[i * 4 + 2] / 255;
+        tensor[i * 3] = r * 2 - 1;
+        tensor[i * 3 + 1] = g * 2 - 1;
+        tensor[i * 3 + 2] = b * 2 - 1;
+      }
+      return { tensor, padding: [padX, padY, padX, padY], originalSize: [sw, sh] };
+    }
+
+    // ============ ANCHOR GENERATION ============
+    function generateAnchors(opts) {
+      const anchors = [];
+      const numLayers = opts.num_layers;
+      const strides = opts.strides;
+      const inputHeight = opts.input_size_height;
+      const inputWidth = opts.input_size_width;
+      const anchorOffsetX = opts.anchor_offset_x;
+      const anchorOffsetY = opts.anchor_offset_y;
+      const interpolatedScaleAspectRatio = opts.interpolated_scale_aspect_ratio;
+      let layerId = 0;
+      while (layerId < numLayers) {
+        let lastSameStrideLayer = layerId;
+        let repeats = 0;
+        while (lastSameStrideLayer < numLayers && strides[lastSameStrideLayer] === strides[layerId]) {
+          lastSameStrideLayer++;
+          repeats += interpolatedScaleAspectRatio === 1.0 ? 2 : 1;
+        }
+        const stride = strides[layerId];
+        const featureMapHeight = Math.floor(inputHeight / stride);
+        const featureMapWidth = Math.floor(inputWidth / stride);
+        for (let y = 0; y < featureMapHeight; y++) {
+          const yCenter = (y + anchorOffsetY) / featureMapHeight;
+          for (let x = 0; x < featureMapWidth; x++) {
+            const xCenter = (x + anchorOffsetX) / featureMapWidth;
+            for (let r = 0; r < repeats; r++) {
+              anchors.push([xCenter, yCenter]);
+            }
+          }
+        }
+        layerId = lastSameStrideLayer;
+      }
+      return anchors;
+    }
+
+    function decodeBoxes(rawBoxes, anchors, inputSize) {
+      const scale = inputSize.width;
+      const numAnchors = anchors.length;
+      const numPoints = rawBoxes.length / numAnchors / 2;
+      const boxes = [];
+      for (let i = 0; i < numAnchors; i++) {
+        const rawBox = [];
+        for (let j = 0; j < numPoints * 2; j++) {
+          rawBox.push(rawBoxes[i * numPoints * 2 + j]);
+        }
+        const scaled = rawBox.map(v => v / scale);
+        const xCenter = scaled[0] + anchors[i][0];
+        const yCenter = scaled[1] + anchors[i][1];
+        for (let k = 2; k < numPoints; k++) {
+          scaled[k * 2] += anchors[i][0];
+          scaled[k * 2 + 1] += anchors[i][1];
+        }
+        const w = scaled[2], h = scaled[3];
+        const xmin = xCenter - w / 2, ymin = yCenter - h / 2;
+        const xmax = xCenter + w / 2, ymax = yCenter + h / 2;
+        const box = [[xmin, ymin], [xmax, ymax]];
+        for (let k = 2; k < numPoints; k++) {
+          box.push([scaled[k * 2], scaled[k * 2 + 1]]);
+        }
+        boxes.push(box);
+      }
+      return boxes;
+    }
+
+    function getSigmoidScores(rawScores) {
+      const scores = [];
+      for (let i = 0; i < rawScores.length; i++) {
+        let score = rawScores[i];
+        if (score < -RAW_SCORE_LIMIT) score = -RAW_SCORE_LIMIT;
+        if (score > RAW_SCORE_LIMIT) score = RAW_SCORE_LIMIT;
+        scores.push(1 / (1 + Math.exp(-score)));
+      }
+      return scores;
+    }
+
+    function convertToDetections(boxes, scores, minScore) {
+      const detections = [];
+      for (let i = 0; i < scores.length; i++) {
+        if (scores[i] > minScore) {
+          const box = boxes[i];
+          if (box[1][0] > box[0][0] && box[1][1] > box[0][1]) {
+            detections.push({ data: box, score: scores[i] });
+          }
+        }
+      }
+      return detections;
+    }
+
+    function computeIoU(axmin, aymin, axmax, aymax, bxmin, bymin, bxmax, bymax) {
+      const interXmin = Math.max(axmin, bxmin);
+      const interYmin = Math.max(aymin, bymin);
+      const interXmax = Math.min(axmax, bxmax);
+      const interYmax = Math.min(aymax, bymax);
+      if (interXmax < interXmin || interYmax < interYmin) return 0;
+      const interArea = (interXmax - interXmin) * (interYmax - interYmin);
+      const box1Area = (axmax - axmin) * (aymax - aymin);
+      const box2Area = (bxmax - bxmin) * (bymax - bymin);
+      return interArea / (box1Area + box2Area - interArea);
+    }
+
+    function nonMaxSuppression(detections, minSuppressionThreshold) {
+      if (detections.length === 0) return [];
+      const sorted = [...detections].sort((a, b) => b.score - a.score);
+      const keep = [];
+      while (sorted.length > 0) {
+        const current = sorted.shift();
+        keep.push(current);
+        const remaining = [];
+        for (const d of sorted) {
+          const iou = computeIoU(
+            current.data[0][0], current.data[0][1], current.data[1][0], current.data[1][1],
+            d.data[0][0], d.data[0][1], d.data[1][0], d.data[1][1]
+          );
+          if (iou < minSuppressionThreshold) remaining.push(d);
+        }
+        sorted.length = 0;
+        sorted.push(...remaining);
+      }
+      return keep;
+    }
+
+    function removeLetterboxPadding(detections, padding) {
+      const [padLeft, padTop, padRight, padBottom] = padding;
+      const hScale = 1 - (padLeft + padRight);
+      const vScale = 1 - (padTop + padBottom);
+      return detections.map(d => ({
+        data: d.data.map(point => [(point[0] - padLeft) / hScale, (point[1] - padTop) / vScale]),
+        score: d.score
+      }));
+    }
+
+    // ============ ROI & LANDMARK HELPERS ============
+    function computeROI(detection, imgWidth, imgHeight) {
+      console.time('computeROI');
+      const [xmin, ymin] = detection.data[0];
+      const [xmax, ymax] = detection.data[1];
+      const cx = (xmin + xmax) / 2;
+      const cy = (ymin + ymax) / 2;
+      const leftEye = detection.data[FaceIndex.LEFT_EYE + 2];
+      const rightEye = detection.data[FaceIndex.RIGHT_EYE + 2];
+      const dx = (rightEye[0] - leftEye[0])*imgWidth;
+      const dy = (rightEye[1] - leftEye[1])*imgHeight;
+      const angle = Math.atan2(dy, dx);
+      const PI = Math.PI;
+      const rotation = angle - 2 * PI * Math.floor((angle + PI) / (2 * PI));
+      const absW = (xmax - xmin) * imgWidth;
+      const absH = (ymax - ymin) * imgHeight;
+      const longSide = Math.max(absW, absH);
+      console.timeEnd('computeROI');
+      return { xCenter: cx, yCenter: cy, width: (longSide / imgWidth) * ROI_SCALE, height: (longSide / imgHeight) * ROI_SCALE, rotation };
+    }
+
+    function cropToROI(sourceCanvas, roi, outputSize) {
+      // Reuse cached canvas (create on first use)
+      console.time('cropToROI');
+      if (!cachedRoiCropCanvas) {
+        cachedRoiCropCanvas = document.createElement('canvas');
+        cachedRoiCropCtx = cachedRoiCropCanvas.getContext('2d');
+      }
+      const canvas = cachedRoiCropCanvas;
+      const ctx = cachedRoiCropCtx;
+      canvas.width = outputSize.width;
+      canvas.height = outputSize.height;
+      const imgW = sourceCanvas.width;
+      const imgH = sourceCanvas.height;
+      const rw = roi.width * imgW;
+      const rh = roi.height * imgH;
+      const rx = (roi.xCenter - roi.width / 2) * imgW;
+      const ry = (roi.yCenter - roi.height / 2) * imgH;
+      ctx.setTransform(1, 0, 0, 1, 0, 0); // reset transform before setting new one
+      ctx.translate(outputSize.width / 2, outputSize.height / 2);
+      ctx.rotate(-roi.rotation);
+      ctx.drawImage(sourceCanvas, rx, ry, rw, rh, -outputSize.width / 2, -outputSize.height / 2, outputSize.width, outputSize.height);
+      // Reset transform for next use
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      const data = ctx.getImageData(0, 0, outputSize.width, outputSize.height).data;
+      const tensor = cachedRoiCropBuffer; // reuse pre-allocated buffer
+      for (let i = 0; i < outputSize.width * outputSize.height; i++) {
+        tensor[i * 3] = data[i * 4] / 255;
+        tensor[i * 3 + 1] = data[i * 4 + 1] / 255;
+        tensor[i * 3 + 2] = data[i * 4 + 2] / 255;
+      }
+      console.timeEnd('cropToROI');
+      return { tensor, canvas };
+    }
+
+    function projectLandmarks(rawLandmarks, roi, numLandmarks, inputSize) {
+      const cos = Math.cos(roi.rotation);
+      const sin = Math.sin(roi.rotation);
+      const iw = inputSize.width;
+      const landmarks = [];
+      for (let i = 0; i < numLandmarks; i++) {
+        let x = rawLandmarks[i * 3] / iw;
+        let y = rawLandmarks[i * 3 + 1] / iw;
+        const z = rawLandmarks[i * 3 + 2] / iw;
+        x -= 0.5; y -= 0.5;
+        const rx = x * cos - y * sin;
+        const ry = x * sin + y * cos;
+        landmarks.push({ x: rx * roi.width + roi.xCenter, y: ry * roi.height + roi.yCenter, z });
+      }
+      return landmarks;
+    }
+
+    function sigmoidLandmark(x) {
+      if (x < -80) x = -80;
+      if (x > 80) x = 80;
+      return 1 / (1 + Math.exp(-x));
+    }
+
+    // ============ INIT MODELS ============
+    async function initModels() {
+      const statusEl = document.getElementById('status');
+      const newDeviceType = document.getElementById('deviceSelect').value;
+      const newDetectorType = document.getElementById('detectorSelect').value;
+
+      // Reset if detector type or device type changed
+      if (detectorType !== newDetectorType || deviceType !== newDeviceType) {
+        detectorGraph = null;
+        yoloGraph = null;
+        dflGraph = null;
+        detectorType = newDetectorType;
+        deviceType = newDeviceType;
+        ROI_SCALE = (detectorType === 'yolo') ? 1.25 : 1.5;
+        mlContext = null;
+        landmarkGraph = null;
+        resetCachedTensors(); // force recreation of detector tensors for new detector type
+      }
+
+      if (!mlContext) {
+        statusEl.textContent = 'Creating WebNN context (' + deviceType.toUpperCase() + ')...';
+        mlContext = await navigator.ml.createContext({ deviceType });
+      }
+
+      const isYolo = detectorType === 'yolo';
+
+      if (isYolo && !yoloGraph) {
+        statusEl.textContent = 'Loading YOLO face detector weights...';
+        const yoloWeights = await WeightsFile.load(
+          '../yolov8n-face-webnn/yolov8n-face.weights',
+          '../yolov8n-face-webnn/yolov8n-face.manifest.json'
+        );
+        statusEl.textContent = 'Building YOLO face detector graph...';
+        const result = await buildYoloFaceGraph(mlContext, yoloWeights);
+        yoloGraph = result.graph;
+        yoloOutputShapes = result.outputShapes;
+        detectorGraph = yoloGraph;  // for shared reference
+        detectorOutputShapes = yoloOutputShapes;
+      } else if (!isYolo && !detectorGraph) {
+        statusEl.textContent = 'Loading SSD face detector weights...';
+        const detWeights = await WeightsFile.load(
+          '../face_detector-webnn/face_detector.weights',
+          '../face_detector-webnn/face_detector.manifest.json'
+        );
+        statusEl.textContent = 'Building SSD face detector graph...';
+        const result = await buildDetectorGraph(mlContext, detWeights);
+        detectorGraph = result.graph;
+        detectorOutputShapes = result.outputShapes;
+      }
+
+      if (!landmarkGraph) {
+        statusEl.textContent = 'Loading face landmark weights...';
+        const lmWeights = await LandmarkWeightsFile.load(
+          '../face_landmark-webnn/face_landmark.weights',
+          '../face_landmark-webnn/face_landmark.manifest.json'
+        );
+        statusEl.textContent = 'Building face landmark graph...';
+        const result = await buildLandmarkGraph(mlContext, lmWeights);
+        landmarkGraph = result.graph;
+        landmarkOutputShapes = result.outputShapes;
+      }
+
+      // Pre-create all tensors so they are reused across frames
+      await ensureDetectorTensors();
+
+      statusEl.textContent = 'Models ready (' + (isYolo ? 'YOLO' : 'SSD') + '). Click "Process Frame" to analyze the current video frame.';
+    }
+
+    // ============ PREPROCESS FRAMES ============
+    function preprocessFrame(){
+      const outputCanvas = document.getElementById('outputCanvas');
+      // Scale to max processing resolution to avoid lag on high-res video
+        const rawW = video.videoWidth;
+        const rawH = video.videoHeight;
+        let vw, vh;
+        if (rawW >= rawH && rawW > MAX_DIM) {
+          vw = MAX_DIM;
+          vh = Math.round(rawH * MAX_DIM / rawW);
+        } else if (rawH > rawW && rawH > MAX_DIM) {
+          vh = MAX_DIM;
+          vw = Math.round(rawW * MAX_DIM / rawH);
+        } else {
+          vw = rawW;
+          vh = rawH;
+        }
+        // Ensure even dimensions (some codecs prefer this)
+        if (vw % 2 !== 0) vw--;
+        if (vh % 2 !== 0) vh--;
+
+        outputCanvas.width = vw;
+        outputCanvas.height = vh;
+
+        // return!
+        return [outputCanvas, vw, vh, rawW, rawH];
+    }
+
+    // ============ PROCESS SINGLE FRAME ============
+    async function processCurrentFrame(outputCanvas, vw, vh, rawW, rawH) {
+      const video = document.getElementById('video');
+      
+      const statusEl = document.getElementById('status');
+      const processBtn = document.getElementById('processBtn');
+
+      if (!video.src || video.readyState < 2) {
+        statusEl.className = 'status error';
+        statusEl.textContent = 'No video loaded or video not ready.';
+        return;
+      }
+      if (isProcessing) return;
+
+      if (unblockTime && Date.now() < unblockTime) {
+        const remaining = Math.ceil((unblockTime - Date.now()) / 1000);
+        statusEl.className = 'status error';
+        statusEl.textContent = `Frame processing blocked due to high frame rate. Please wait ${remaining} seconds.`;
+        return;
+      }
+
+      isProcessing = true;
+      processBtn.disabled = true;
+      
+
+      try {
+        if (!navigator.ml) throw new Error('WebNN not supported. Use Chrome with WebNN flags.');
+
+        await initModels();
+
+        // Capture & scale video frame to temp canvas (reuse cached canvas)
+        if (!cachedFrameCanvas) {
+          cachedFrameCanvas = document.createElement('canvas');
+          cachedFrameCtx = cachedFrameCanvas.getContext('2d');
+        }
+        const frameCanvas = cachedFrameCanvas;
+        const fctx = cachedFrameCtx;
+        if (frameCanvas.width !== vw || frameCanvas.height !== vh) {
+          frameCanvas.width = vw;
+          frameCanvas.height = vh;
+        }
+        fctx.drawImage(video, 0, 0, rawW, rawH, 0, 0, vw, vh);
+        console.time('process frame');
+        // Step 1: Face detector
+        statusEl.textContent = 'Preprocessing...';
+        const isYolo = detectorType === 'yolo';
+        let pixels, tensor, originalSize, detections;
+        let dw, dh, ratio;  // YOLO scale-back params
+
+        const detectorStart = performance.now();
+        statusEl.textContent = 'Running face detector (' + (isYolo ? 'YOLO' : 'SSD') + ')...';
+        console.log('preprocess begin: ' + detectorStart.toFixed(0) + 'ms');
+        if (isYolo) {
+          // ---- YOLO preprocessing ----
+          console.time('YOLO preprocess');
+          console.log('YOLO preprocess start!', performance.now(), performance.now() - detectorStart);
+          const prep = YOLODetector.preprocess(frameCanvas);
+          console.log('preprocess end: ' + performance.now().toFixed(0) + 'ms', 'duration: ' + (performance.now() - detectorStart).toFixed(0) + 'ms');
+          console.timeEnd('YOLO preprocess');
+          pixels = prep.pixels;  // Uint8ClampedArray, RGBA raw
+          originalSize = prep.origShape;
+          dw = prep.dw;
+          dh = prep.dh;
+          ratio = prep.ratio;
+
+          // ---- YOLO inference (reuse cached tensors) ----
+          mlContext.writeTensor(cachedYoloInputTensor, pixels);
+
+          const useDFLGraph = document.getElementById('dflGraphCheck').checked;
+
+          let rawOutputs, rawShapes;
+          if (useDFLGraph) {
+            // Build DFL graph (first time or after detector switch)
+            if (!dflGraph) {
+              console.time('DFL graph build');
+              console.log('Building DFL graph...', performance.now(), performance.now() - detectorStart);
+              const dflResult = await buildYoloFaceDFLGraph(mlContext);
+              dflGraph = dflResult.graph;
+              dflOutputShapes = dflResult.outputShapes;
+              cachedDflOutTensors = null; // force recreation with new shapes
+              console.timeEnd('DFL graph build');
+            }
+            // Ensure DFL output tensors are created
+            await ensureDflTensors();
+
+            console.log('YOLO inference Preparation done!', performance.now(), performance.now() - detectorStart);
+            console.time('YOLO inference');
+            // Dispatch chain: YOLO -> DFL (reuse cached intermediate and output tensors)
+            mlContext.dispatch(yoloGraph, { images: cachedYoloInputTensor },
+              { 'output0': cachedYoloIntermTensors['output0'], 'cat_17': cachedYoloIntermTensors['cat_17'], 'cat_18': cachedYoloIntermTensors['cat_18'] });
+            mlContext.dispatch(dflGraph,
+              { 'in0': cachedYoloIntermTensors['output0'], 'in1': cachedYoloIntermTensors['cat_17'], 'in2': cachedYoloIntermTensors['cat_18'] },
+              cachedDflOutTensors);
+
+            rawOutputs = [];
+            rawShapes = [];
+            const dflOutNames = ['dfl0', 'dfl17', 'dfl18'];
+            for (const name of dflOutNames) {
+              rawOutputs.push(new Float32Array(await mlContext.readTensor(cachedDflOutTensors[name])));
+              rawShapes.push(dflOutputShapes[name]);
+            }
+          } else {
+            console.time('YOLO inference');
+            // ---- JS DFL path (reuse cached output tensors) ----
+            mlContext.dispatch(yoloGraph, { images: cachedYoloInputTensor }, cachedYoloOutTensors);
+
+            rawOutputs = [];
+            rawShapes = [];
+            const outNames = ['output0', 'cat_17', 'cat_18'];
+            for (const name of outNames) {
+              rawOutputs.push(new Float32Array(await mlContext.readTensor(cachedYoloOutTensors[name])));
+              rawShapes.push(yoloOutputShapes[name]);
+            }
+          }
+          console.log('dispatch end: ' + performance.now().toFixed(0) + 'ms', 'duration: ' + (performance.now() - detectorStart).toFixed(0) + 'ms');
+          console.log('YOLO infer done!', performance.now(), performance.now() - detectorStart);
+          console.timeEnd('YOLO inference');
+          console.time('YOLO postprocess');
+          // ---- YOLO postprocessing ----
+          const result = YOLODetector.postprocess(rawOutputs, rawShapes, undefined, undefined, useDFLGraph);
+          const scaled = YOLODetector.scaleBack(
+            result.boxes, result.keypoints, originalSize, ratio, dw, dh
+          );
+          detections = YOLODetector.toDetections(scaled.boxes, result.scores, scaled.keypoints, originalSize);
+          console.log('YOLO postprocess done!', performance.now(), performance.now() - detectorStart);
+          console.timeEnd('YOLO postprocess');
+        } else {
+          // ---- SSD preprocessing ----
+          console.time('preprocess');
+          const prep = preprocessForDetector(frameCanvas);
+          tensor = prep.tensor;
+          originalSize = prep.originalSize;
+          const padding = prep.padding;
+          console.timeEnd('preprocess');
+
+          console.time('SSD inference');
+          // ---- SSD inference (reuse cached tensors) ----
+          mlContext.writeTensor(cachedSsdInputTensor, tensor);
+
+          mlContext.dispatch(detectorGraph, { input: cachedSsdInputTensor }, { regressors: cachedSsdRegTensor, classificators: cachedSsdClsTensor });
+
+          const regressors = new Float32Array(await mlContext.readTensor(cachedSsdRegTensor));
+          const classificators = new Float32Array(await mlContext.readTensor(cachedSsdClsTensor));
+
+          console.timeEnd('SSD inference');
+
+          
+          // ---- SSD postprocessing ----
+          console.time('SSD postprocess');
+          const anchors = generateAnchors(SSD_OPTIONS_SHORT);
+          const boxes = decodeBoxes(regressors, anchors, { width: 128, height: 128 });
+          const scores = getSigmoidScores(classificators);
+          detections = convertToDetections(boxes, scores, MIN_SCORE);
+          detections = nonMaxSuppression(detections, MIN_SUPPRESSION_THRESHOLD);
+          detections = removeLetterboxPadding(detections, padding);
+          console.timeEnd('SSD postprocess');
+        }
+
+        const detectorEnd = performance.now();
+        console.log('detector end: ' + detectorEnd.toFixed(0) + 'ms', 'duration: ' + (detectorEnd - detectorStart).toFixed(0) + 'ms');
+        if (detections.length === 0) {
+          statusEl.className = 'status info';
+          statusEl.textContent = 'No face detected in this frame. (' + (detectorEnd - detectorStart).toFixed(0) + 'ms)';
+          return;
+        }
+
+        // Step 2: For each face, run landmark model and draw lips
+        const [imgWidth, imgHeight] = originalSize;
+        const lipColor = document.getElementById('lipColor').value;
+        const debugOn = document.getElementById('debugCheck').checked;
+        let facesProcessed = 0;
+        const allLandmarkSets = [];
+        const allROIs = [];
+        const allLandmarkStartTime = [];
+        const allLandmarkEndTime = [];
+        
+        for (const det of detections) {
+          statusEl.textContent = 'Running face landmark (' + (facesProcessed + 1) + '/' + detections.length + ')...';
+          const roi = computeROI(det, imgWidth, imgHeight);
+          const { tensor: lmTensor } = cropToROI(frameCanvas, roi, LM_INPUT_SIZE);
+          console.time('landmark inference');
+          // Reuse cached landmark tensors
+          mlContext.writeTensor(cachedLmInputTensor, lmTensor);
+
+          allLandmarkStartTime.push(performance.now());
+          mlContext.dispatch(landmarkGraph,
+            { input_1: cachedLmInputTensor },
+            { conv2d_20: cachedLmOutTensor, conv2d_30: cachedLmFlagTensor }
+          );
+
+          const rawLandmarks = new Float32Array(await mlContext.readTensor(cachedLmOutTensor));
+          const rawFlag = new Float32Array(await mlContext.readTensor(cachedLmFlagTensor));
+          console.timeEnd('landmark inference');
+          console.time('landmark postprocess');
+          allLandmarkEndTime.push(performance.now());
+          if (sigmoidLandmark(rawFlag[0]) <= LANDMARK_DETECTION_THRESHOLD) continue;
+
+          const landmarks = projectLandmarks(rawLandmarks, roi, 468, LM_INPUT_SIZE);
+          allLandmarkSets.push(landmarks);
+          allROIs.push(roi);
+          facesProcessed++;
+          console.timeEnd('landmark postprocess');
+        }
+
+        const elapsed = (detectorEnd - detectorStart).toFixed(0);
+        statusEl.className = 'status success';
+        statusEl.textContent = 'Face Detection: ' + elapsed + 'ms | Faces: ' + detections.length;
+        console.timeEnd('process frame');
+        for (let i = 0; i < allLandmarkSets.length; i++) {
+          const lmTime = (allLandmarkEndTime[i] - allLandmarkStartTime[i]).toFixed(0);
+          statusEl.textContent += ' | Face ' + (i + 1) + ' landmarks: ' + lmTime + 'ms';
+        }
+
+        // Draw original frame on output canvas
+        const octx = outputCanvas.getContext('2d');
+        octx.drawImage(frameCanvas, 0, 0);
+
+        // Draw lip overlay
+        for (const landmarks of allLandmarkSets) {
+          drawLipOverlay(octx, landmarks, lipColor, vw, vh);
+        }
+        // Draw debug overlays if enabled
+        if (debugOn) {
+          drawDebugOverlays(octx, detections, allLandmarkSets, vw, vh);
+          for (const roi of allROIs) {
+            drawDebugROI(octx, roi, vw, vh);
+          }
+        }
+
+        frameCount++;
+        updateFPS();
+        // Per-minute frame counting
+        if (frameCountActive) {
+          const now = Date.now();
+          if (minuteStartTime === null) {
+            minuteStartTime = now;
+          }
+          minuteFrameCount++;
+
+          if (minuteFrameCount >= minuteFrameCountLimit) {
+            statusEl.className = 'status warning';
+            statusEl.textContent = 'Warning: Frame count exceeded limit of ' + minuteFrameCountLimit + ' frames in current minute. Stop processing until the next minute comes.';
+            unblockTime = minuteStartTime + 60000; // block until next minute
+          }
+          // Check if a minute (60s) has elapsed
+          if (now - minuteStartTime >= 60000) {
+            const d = new Date(minuteStartTime);
+            const hh = String(d.getHours()).padStart(2, '0');
+            const mm = String(d.getMinutes()).padStart(2, '0');
+            frameCountLog.push({ minute: hh + ':' + mm, count: minuteFrameCount });
+            // Start next minute window
+            minuteStartTime = now;
+            minuteFrameCount = 0;
+            updateFrameCountDisplay();
+          }
+          // Always update the current-minute display
+          updateCurrentMinuteDisplay();
+        }
+      } catch (err) {
+        statusEl.className = 'status error';
+        statusEl.textContent = 'Error: ' + err.message;
+        console.error(err);
+      } finally {
+        isProcessing = false;
+        processBtn.disabled = false;
+      }
+    }
+
+    // ============ WRAPPER TO FRAME PROCESSING ============
+    async function processFrameWrapper(){
+      const [outputCanvas, vw, vh, rawW, rawH] = preprocessFrame();
+      await processCurrentFrame(outputCanvas, vw, vh, rawW, rawH);
+    }
+
+    // ============ LIP DRAWING ============
+    function drawLipOverlay(ctx, landmarks, color, canvasW, canvasH) {
+      // Draw outer lip contour
+      const outerPoints = LIP_OUTER.map(idx => landmarks[idx]);
+      const innerPoints = LIP_INNER.map(idx => landmarks[idx]);
+      if (outerPoints.length < 3) return;
+
+      ctx.save();
+      ctx.globalAlpha = 0.65;
+
+      // Fill outer lip
+      ctx.beginPath();
+      ctx.moveTo(outerPoints[0].x * canvasW, outerPoints[0].y * canvasH);
+      for (let i = 1; i < outerPoints.length; i++) {
+        ctx.lineTo(outerPoints[i].x * canvasW, outerPoints[i].y * canvasH);
+      }
+      ctx.closePath();
+
+      if (innerPoints.length >= 3) {
+        // create a hole in the outer lip polygon. for some reason, this only works if we build the polygon CCW.
+        ctx.moveTo(innerPoints[innerPoints.length-1].x*canvasW, innerPoints[innerPoints.length-1].y*canvasH);
+        for (let i = innerPoints.length-2; i>=0; i--){
+          ctx.lineTo(innerPoints[i].x*canvasW, innerPoints[i].y*canvasH);
+        }
+      }
+
+      ctx.closePath();
+
+      ctx.fillStyle = color;
+      ctx.fill();
+
+      // Draw a slightly softer edge
+      ctx.strokeStyle = color;
+      ctx.lineWidth = Math.max(canvasW, canvasH) * 0.006;
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+
+      // Optional: subtle highlight on upper lip center
+      const upperLipCenter = landmarks[13]; // center of upper inner lip
+      if (upperLipCenter) {
+        ctx.globalAlpha = 0.2;
+        ctx.beginPath();
+        ctx.arc(upperLipCenter.x * canvasW, upperLipCenter.y * canvasH, Math.max(canvasW, canvasH) * 0.012, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
+    // ============ DEBUG DRAWING ============
+    function drawDebugOverlays(ctx, detections, allLandmarkSets, cw, ch) {
+      ctx.save();
+      // Draw face detector bounding boxes
+      ctx.strokeStyle = '#00FF00';
+      ctx.lineWidth = 2;
+      ctx.font = '12px monospace';
+      for (const det of detections) {
+        const [xmin, ymin] = det.data[0];
+        const [xmax, ymax] = det.data[1];
+        ctx.strokeRect(xmin * cw, ymin * ch, (xmax - xmin) * cw, (ymax - ymin) * ch);
+        ctx.fillStyle = '#00FF00';
+        ctx.fillText((det.score * 100).toFixed(0) + '%', xmin * cw, ymin * ch - 4);
+        // Draw keypoints (SSD=6, YOLO=5)
+        const numKps = det.data.length - 2;
+        for (let k = 0; k < numKps; k++) {
+          const kp = det.data[k + 2];
+          if (!kp) continue;
+          ctx.fillStyle = '#FF0000';
+          ctx.beginPath();
+          ctx.arc(kp[0] * cw, kp[1] * ch, 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // draw straight line connecting both eyes
+        const leftEye = det.data[FaceIndex.RIGHT_EYE + 2];
+        const rightEye = det.data[FaceIndex.LEFT_EYE + 2];
+
+        const dy = (leftEye[1] - rightEye[1])*ch;
+        const dx = (leftEye[0] - rightEye[0])*cw;
+
+        const x_offset_start = 0;
+        const y_offset_start = leftEye[1]*ch - (dy/dx)*(leftEye[0]*cw - x_offset_start);
+
+        const x_offset_end = cw;
+        const y_offset_end = leftEye[1]*ch - (dy/dx)*(leftEye[0]*cw - x_offset_end);
+
+        ctx.strokeStyle = 'blue';
+        ctx.lineWidth = 3;
+
+        ctx.beginPath();
+        ctx.moveTo(x_offset_start, y_offset_start);
+        ctx.lineTo(x_offset_end, y_offset_end);
+
+        ctx.stroke();
+      }
+      // Draw face landmark mesh
+      ctx.strokeStyle = 'rgba(255, 255, 0, 0.6)';
+      ctx.lineWidth = 0.8;
+      for (const landmarks of allLandmarkSets) {
+        for (const [i, j] of MESH_CONNECTIONS) {
+          if (i >= landmarks.length || j >= landmarks.length) continue;
+          ctx.beginPath();
+          ctx.moveTo(landmarks[i].x * cw, landmarks[i].y * ch);
+          ctx.lineTo(landmarks[j].x * cw, landmarks[j].y * ch);
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+
+    function drawDebugROI(ctx, roi, cw, ch) {
+      ctx.save();
+      const cx = roi.xCenter * cw;
+      const cy = roi.yCenter * ch;
+      const hw = roi.width / 2 * cw;
+      const hh = roi.height / 2 * ch;
+      const deg = roi.rotation * 180 / Math.PI;
+      ctx.translate(cx, cy);
+      ctx.rotate(roi.rotation);
+      ctx.strokeStyle = '#FF0000';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 4]);
+      ctx.strokeRect(-hw, -hh, hw * 2, hh * 2);
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    function darkenColor(hex, factor) {
+      const r = parseInt(hex.slice(1, 3), 16);
+      const g = parseInt(hex.slice(3, 5), 16);
+      const b = parseInt(hex.slice(5, 7), 16);
+      const dr = Math.round(r * (1 - factor));
+      const dg = Math.round(g * (1 - factor));
+      const db = Math.round(b * (1 - factor));
+      return '#' + [dr, dg, db].map(v => Math.max(0, Math.min(255, v)).toString(16).padStart(2, '0')).join('');
+    }
+
+    // ============ VIDEO PLAYBACK ============
+    function toggleVideoPlay() {
+      const video = document.getElementById('video');
+      const btn = document.getElementById('videoPlayBtn');
+      if (video.paused) {
+        video.play();
+        btn.innerHTML = '⏸ Pause';
+        btn.classList.add('playing');
+      } else {
+        video.pause();
+        btn.innerHTML = '▶ Play';
+        btn.classList.remove('playing');
+      }
+    }
+
+    // ============ AUTO PROCESS ============
+    async function toggleAutoProcess() {
+      const autoBtn = document.getElementById('autoProcessBtn');
+      const video = document.getElementById('video');
+      const statusEl = document.getElementById('status');
+
+      if (autoPlayActive) {
+        autoPlayActive = false;
+        autoBtn.classList.remove('playing');
+        autoBtn.textContent = 'Auto Process';
+        if (autoPlayRAF) { cancelAnimationFrame(autoPlayRAF); autoPlayRAF = null; }
+        statusEl.textContent = 'Auto process stopped.';
+        return;
+      }
+
+      if (!video.src || video.readyState < 2) {
+        statusEl.className = 'status error';
+        statusEl.textContent = 'No video loaded.';
+        return;
+      }
+
+      autoPlayActive = true;
+      autoBtn.classList.add('playing');
+      autoBtn.textContent = 'Stop Process';
+
+      if (!detectorGraph || !landmarkGraph) {
+        await initModels();
+      }
+
+      statusEl.textContent = 'Auto processing started...';
+
+      const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+      const [outputCanvas, vw, vh, rawW, rawH] = preprocessFrame();
+      async function loop() {
+        if (!autoPlayActive) return;
+        if (!isProcessing) {
+          await processCurrentFrame(outputCanvas, vw, vh, rawW, rawH);
+        }
+        autoPlayRAF = requestAnimationFrame(() => loop());
+      }
+
+      loop();
+    }
+
+    // ============ DOWNLOAD ============
+    function downloadFrame() {
+      const video = document.getElementById('video');
+      const canvas = document.createElement('canvas');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext('2d').drawImage(video, 0, 0);
+      canvas.toBlob(blob => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'frame_' + Date.now() + '.png';
+        a.click();
+        URL.revokeObjectURL(url);
+      }, 'image/png');
+    }
+
+    function updateFPS() {
+      const now = performance.now();
+      if (lastFPSTime === 0) { lastFPSTime = now; return; }
+      const elapsed = now - lastFPSTime;
+      if (elapsed > 1000 && frameCount > 0) {
+        const fps = (frameCount / (elapsed / 1000)).toFixed(1);
+        document.getElementById('fpsDisplay').textContent = 'Processed: ' + frameCount + ' frames | ~' + fps + ' fps';
+        frameCount = 0;
+        lastFPSTime = now;
+      }
+    }
+
+    // ============ PER-MINUTE FRAME COUNT ============
+    function toggleFrameCount() {
+      const btn = document.getElementById('frameCountBtn');
+      const logEl = document.getElementById('frameCountLog');
+      const statusEl = document.getElementById('status');
+
+      if (frameCountActive) {
+        // Stop counting — flush current minute
+        frameCountActive = false;
+        btn.classList.remove('playing');
+        btn.innerHTML = '⏱ Start Frame Count';
+        // Log the partial minute if any frames were counted
+        if (minuteFrameCount > 0 && minuteStartTime !== null) {
+          const d = new Date(minuteStartTime);
+          const hh = String(d.getHours()).padStart(2, '0');
+          const mm = String(d.getMinutes()).padStart(2, '0');
+          frameCountLog.push({ minute: hh + ':' + mm, count: minuteFrameCount });
+          updateFrameCountDisplay();
+        }
+        minuteFrameCount = 0;
+        minuteStartTime = null;
+        document.getElementById('currentMinuteDisplay').style.display = 'none';
+        statusEl.textContent = 'Frame counting stopped. Total periods logged: ' + frameCountLog.length + '.';
+      } else {
+        // Start counting
+        frameCountActive = true;
+        btn.classList.add('playing');
+        btn.innerHTML = '⏱ Stop Frame Count';
+        frameCountLog = [];
+        minuteFrameCount = 0;
+        minuteStartTime = null;
+        logEl.style.display = 'block';
+        document.getElementById('frameCountEntries').innerHTML = '';
+        document.getElementById('currentMinuteDisplay').style.display = 'block';
+        statusEl.textContent = 'Frame counting started...';
+      }
+    }
+
+    function updateFrameCountDisplay() {
+      const entriesEl = document.getElementById('frameCountEntries');
+      let html = '';
+      for (const entry of frameCountLog) {
+        html += '<div class="entry"><span class="minute">' + entry.minute + '</span><span class="count">' + entry.count + '</span></div>';
+      }
+      entriesEl.innerHTML = html;
+      // Auto-scroll to bottom
+      const logEl = document.getElementById('frameCountLog');
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function updateCurrentMinuteDisplay() {
+      if (!frameCountActive || minuteStartTime === null) return;
+      const d = new Date(minuteStartTime);
+      const hh = String(d.getHours()).padStart(2, '0');
+      const mm = String(d.getMinutes()).padStart(2, '0');
+      const elapsed = Math.floor((Date.now() - minuteStartTime) / 1000);
+      document.getElementById('currentMinuteDisplay').style.display = 'block';
+      document.getElementById('currentMinuteDisplay').textContent =
+        'Current (' + hh + ':' + mm + ' — ' + elapsed + 's elapsed): ' + minuteFrameCount + ' frames';
+    }
+
+    function updateFramePerMinuteConstraint() {
+      const input = document.getElementById('framePerMinute');
+      const value = parseInt(input.value);
+      if (isNaN(value) || value <= 0) {
+        alert('Please enter a valid positive integer for the frame count limit.');
+        input.value = minuteFrameCountLimit;
+        return;
+      }
+      minuteFrameCountLimit = value;
+      document.getElementById('frameCountLimitDisplay').textContent = 'Limit: ' + minuteFrameCountLimit + ' frames/minute';
+      const statusEl = document.getElementById('status');
+      statusEl.className = 'status info';
+      statusEl.textContent = 'Frame count limit updated to ' + minuteFrameCountLimit + ' frames/minute.';
+    }
+
+    // ============ INIT ============
+    window.addEventListener('load', () => {
+      const videoInput = document.getElementById('videoInput');
+      const video = document.getElementById('video');
+      const uploadArea = document.getElementById('uploadArea');
+      const processBtn = document.getElementById('processBtn');
+      const videoPlayBtn = document.getElementById('videoPlayBtn');
+      const autoProcessBtn = document.getElementById('autoProcessBtn');
+      const downloadBtn = document.getElementById('downloadBtn');
+      const frameCountBtn = document.getElementById('frameCountBtn');
+      const lipColor = document.getElementById('lipColor');
+      const colorPreview = document.getElementById('colorPreview');
+      const statusEl = document.getElementById('status');
+
+      videoInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const url = URL.createObjectURL(file);
+        video.src = url;
+        video.load();
+        uploadArea.classList.add('has-video');
+        processBtn.disabled = false;
+        videoPlayBtn.disabled = false;
+        autoProcessBtn.disabled = false;
+        downloadBtn.disabled = false;
+        frameCountBtn.disabled = false;
+        statusEl.className = 'status info';
+        statusEl.textContent = 'Video loaded: ' + file.name + '. Ready to process frames.';
+      });
+
+      video.addEventListener('loadedmetadata', () => {
+        // Canvas will be sized on first processing (respects MAX_DIM)
+        const outputCanvas = document.getElementById('outputCanvas');
+        outputCanvas.width = 640;
+        outputCanvas.height = 360;
+        const octx = outputCanvas.getContext('2d');
+        octx.fillStyle = '#000';
+        octx.fillRect(0, 0, outputCanvas.width, outputCanvas.height);
+      });
+
+      // Keep play button in sync with direct video controls
+      video.addEventListener('play', () => {
+        videoPlayBtn.innerHTML = '⏸ Pause';
+        videoPlayBtn.classList.add('playing');
+      });
+      video.addEventListener('pause', () => {
+        videoPlayBtn.innerHTML = '▶ Play';
+        videoPlayBtn.classList.remove('playing');
+      });
+
+      lipColor.addEventListener('input', () => {
+        colorPreview.style.background = lipColor.value;
+      });
+
+      // Drag and drop support
+      uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); });
+      uploadArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const file = e.dataTransfer.files[0];
+        if (!file || !file.type.startsWith('video/')) return;
+        const url = URL.createObjectURL(file);
+        video.src = url;
+        video.load();
+        uploadArea.classList.add('has-video');
+        processBtn.disabled = false;
+        videoPlayBtn.disabled = false;
+        autoProcessBtn.disabled = false;
+        downloadBtn.disabled = false;
+        frameCountBtn.disabled = false;
+        statusEl.className = 'status info';
+        statusEl.textContent = 'Video loaded: ' + file.name + '. Ready to process frames.';
+      });
+    });
+  </script>
+</body>
+</html>

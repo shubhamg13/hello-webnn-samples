@@ -1,0 +1,1614 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebNN · yolov8n-face</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: rgba(0, 47, 167, 0.02); color: #1a1a1a; padding: 1rem; }
+    .container { margin: 0 auto; }
+    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+    .subtitle { color: #666; margin-bottom: 1rem; font-size: 0.9rem; }
+    .card { background: #fff; padding: 1rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .model-info { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+    @media (max-width: 600px) { .model-info { grid-template-columns: 1fr; } }
+    .controls { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; }
+    label { font-weight: 600; font-size: 0.9rem; }
+    select { padding: 0.16rem 0.5rem; border: 1px solid #ddd; font-size: 0.9rem; }
+    button { background: rgba(0, 47, 167, 1); color: #fff; border: none; padding: 0.25rem 1rem; font-size: 0.9rem; cursor: pointer; }
+    button:hover { background: rgba(0, 47, 167, 1); }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    .status { padding: 1rem; margin-top: 1rem; font-size: 0.9rem; }
+    .status.info { background: #e3f2fd; border-left: 3px solid #2196F3; }
+    .status.success { background: #e9f8f0; border-left: 3px solid #068906; }
+    .status.error { background: #ffebee; border-left: 3px solid #f44336; }
+    table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.85rem; }
+    table tr {display: grid; grid-template-columns: 1fr 1fr 1fr; }
+    th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid #eee; }
+    th { color: #666; font-weight: 600; }
+    pre { margin: 0.5rem 0; background: rgba(0, 47, 167, 0.02); padding: 0.5rem 1em; overflow-x: auto; font-size: 0.8rem; max-height: 200px; }
+    #results { font-size: 0.85rem; margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>WebNN · yolov8n-face</h1>
+    <p class="subtitle">Source format: onnx &middot; 233 operations &middot; 150 constants</p>
+
+    <div class="card">
+      <div class="controls">
+        <label for="device">Device:</label>
+        <select id="device">
+          <option value="cpu">CPU</option>
+          <option value="gpu">GPU</option>
+          <option value="npu">NPU</option>
+        </select>
+        <button id="runBtn" onclick="run()">Run Inference</button>
+      </div>
+      <div id="status" class="status info">Ready. Select a device and click Run.</div>
+    </div>
+
+    <div class="card">
+      <h3>Model Info</h3>
+      <div class="model-info">
+        <table>
+          <tr><th>Inputs</th><th>Shape</th><th>Data Type</th></tr>
+          <tr><td>images</td><td>[1,640,640,4]</td><td>uint8</td></tr>
+        </table>
+        <table>
+          <tr><th>Outputs</th><th>Shape</th><th>Data Type</th></tr>
+          <tr><td>dfl0</td><td>[1,20,80,80]</td><td>float32</td></tr>
+          <tr><td>dfl17</td><td>[1,20,40,40]</td><td>float32</td></tr>
+          <tr><td>dfl18</td><td>[1,20,20,20]</td><td>float32</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" id="resultsCard" style="display:none;">
+      <h3>Results</h3>
+      <div id="results"></div>
+    </div>
+  </div>
+
+  <script>
+// ---- Generated WebNN Code ----
+class WeightsFile {
+  constructor(buffer, manifest) {
+    this.buffer = buffer;
+    this.manifest = manifest;
+  }
+
+  static async load(weightsPath, manifestPath) {
+    const [wRes, mRes] = await Promise.all([fetch(weightsPath), fetch(manifestPath)]);
+    if (!wRes.ok) throw new Error('Failed to load weights: ' + wRes.statusText);
+    if (!mRes.ok) throw new Error('Failed to load manifest: ' + mRes.statusText);
+    const buffer = await wRes.arrayBuffer();
+    const manifest = await mRes.json();
+    if (manifest.format !== 'wg-weights-manifest') throw new Error('Invalid manifest format');
+    const magic = new TextDecoder().decode(new Uint8Array(buffer, 0, 4));
+    if (magic !== 'WGWT') throw new Error('Invalid weights file');
+    return new WeightsFile(buffer, manifest);
+  }
+
+  getSlice(name) {
+    const t = this.manifest.tensors[name];
+    if (!t) throw new Error('Tensor not found: ' + name);
+    return t;
+  }
+
+  getData(name) {
+    const t = this.getSlice(name);
+    return this.buffer.slice(t.byteOffset, t.byteOffset + t.byteLength);
+  }
+}
+
+/**
+ * Build WebNN graph for model: yolov8n-face
+ * Source format: onnx
+ */
+async function buildGraph(context, weights) {
+  const builder = new MLGraphBuilder(context);
+
+  // Graph inputs — raw RGBA uint8, NHWC layout
+  const imagesRaw = builder.input('images', { dataType: 'uint8', shape: [1,640,640,4] });
+
+  // ---- Preprocessing (runs on GPU/NPU via WebNN) ----
+  // 1. Slice RGBA → RGB (drop alpha channel)
+  const imagesRGB = builder.slice(imagesRaw, [0, 0, 0, 0], [1, 640, 640, 3]);
+  // 2. Cast uint8 [0,255] → float32
+  const imagesFloat = builder.cast(imagesRGB, 'float32');
+  // 3. Normalize: divide by 255.0
+  const normConst = builder.constant({ dataType: 'float32', shape: [1] }, new Float32Array([255.0]));
+  const imagesNormalized = builder.div(imagesFloat, normConst);
+  // 4. Transpose NHWC [1,640,640,3] → NCHW [1,3,640,640]
+  const images = builder.transpose(imagesNormalized, { permutation: [0, 3, 1, 2] });
+
+  // Constants (loaded from weights file)
+  const model_0_conv_weight = (() => {
+    const sl = weights.getSlice('model.0.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16,3,3,3] }, new Float32Array(buf));
+  })();
+  const model_0_conv_bias = (() => {
+    const sl = weights.getSlice('model.0.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16] }, new Float32Array(buf));
+  })();
+  const model_1_conv_bias = (() => {
+    const sl = weights.getSlice('model.1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32] }, new Float32Array(buf));
+  })();
+  const model_2_cv1_conv_bias = (() => {
+    const sl = weights.getSlice('model.2.cv1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32] }, new Float32Array(buf));
+  })();
+  const model_2_cv2_conv_bias = (() => {
+    const sl = weights.getSlice('model.2.cv2.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32] }, new Float32Array(buf));
+  })();
+  const model_2_m_0_cv1_conv_bias = (() => {
+    const sl = weights.getSlice('model.2.m.0.cv1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16] }, new Float32Array(buf));
+  })();
+  const model_2_m_0_cv2_conv_bias = (() => {
+    const sl = weights.getSlice('model.2.m.0.cv2.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16] }, new Float32Array(buf));
+  })();
+  const model_3_conv_bias = (() => {
+    const sl = weights.getSlice('model.3.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_4_cv1_conv_bias = (() => {
+    const sl = weights.getSlice('model.4.cv1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_4_cv2_conv_bias = (() => {
+    const sl = weights.getSlice('model.4.cv2.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_4_m_0_cv1_conv_bias = (() => {
+    const sl = weights.getSlice('model.4.m.0.cv1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32] }, new Float32Array(buf));
+  })();
+  const model_4_m_0_cv2_conv_bias = (() => {
+    const sl = weights.getSlice('model.4.m.0.cv2.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32] }, new Float32Array(buf));
+  })();
+  const model_4_m_1_cv1_conv_bias = (() => {
+    const sl = weights.getSlice('model.4.m.1.cv1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32] }, new Float32Array(buf));
+  })();
+  const model_4_m_1_cv2_conv_bias = (() => {
+    const sl = weights.getSlice('model.4.m.1.cv2.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32] }, new Float32Array(buf));
+  })();
+  const model_5_conv_bias = (() => {
+    const sl = weights.getSlice('model.5.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const model_6_cv1_conv_bias = (() => {
+    const sl = weights.getSlice('model.6.cv1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const model_6_cv2_conv_bias = (() => {
+    const sl = weights.getSlice('model.6.cv2.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const model_6_m_0_cv1_conv_bias = (() => {
+    const sl = weights.getSlice('model.6.m.0.cv1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_6_m_0_cv2_conv_bias = (() => {
+    const sl = weights.getSlice('model.6.m.0.cv2.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_6_m_1_cv1_conv_bias = (() => {
+    const sl = weights.getSlice('model.6.m.1.cv1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_6_m_1_cv2_conv_bias = (() => {
+    const sl = weights.getSlice('model.6.m.1.cv2.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_7_conv_bias = (() => {
+    const sl = weights.getSlice('model.7.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [256] }, new Float32Array(buf));
+  })();
+  const model_8_cv1_conv_bias = (() => {
+    const sl = weights.getSlice('model.8.cv1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [256] }, new Float32Array(buf));
+  })();
+  const model_8_cv2_conv_bias = (() => {
+    const sl = weights.getSlice('model.8.cv2.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [256] }, new Float32Array(buf));
+  })();
+  const model_8_m_0_cv1_conv_bias = (() => {
+    const sl = weights.getSlice('model.8.m.0.cv1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const model_8_m_0_cv2_conv_bias = (() => {
+    const sl = weights.getSlice('model.8.m.0.cv2.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const model_9_cv1_conv_bias = (() => {
+    const sl = weights.getSlice('model.9.cv1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const model_9_cv2_conv_bias = (() => {
+    const sl = weights.getSlice('model.9.cv2.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [256] }, new Float32Array(buf));
+  })();
+  const model_12_cv1_conv_bias = (() => {
+    const sl = weights.getSlice('model.12.cv1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const model_12_cv2_conv_bias = (() => {
+    const sl = weights.getSlice('model.12.cv2.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const model_12_m_0_cv1_conv_bias = (() => {
+    const sl = weights.getSlice('model.12.m.0.cv1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_12_m_0_cv2_conv_bias = (() => {
+    const sl = weights.getSlice('model.12.m.0.cv2.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_15_cv1_conv_bias = (() => {
+    const sl = weights.getSlice('model.15.cv1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_15_cv2_conv_bias = (() => {
+    const sl = weights.getSlice('model.15.cv2.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_15_m_0_cv1_conv_bias = (() => {
+    const sl = weights.getSlice('model.15.m.0.cv1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32] }, new Float32Array(buf));
+  })();
+  const model_15_m_0_cv2_conv_bias = (() => {
+    const sl = weights.getSlice('model.15.m.0.cv2.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32] }, new Float32Array(buf));
+  })();
+  const model_16_conv_bias = (() => {
+    const sl = weights.getSlice('model.16.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_18_cv1_conv_bias = (() => {
+    const sl = weights.getSlice('model.18.cv1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const model_18_cv2_conv_bias = (() => {
+    const sl = weights.getSlice('model.18.cv2.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const model_18_m_0_cv1_conv_bias = (() => {
+    const sl = weights.getSlice('model.18.m.0.cv1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_18_m_0_cv2_conv_bias = (() => {
+    const sl = weights.getSlice('model.18.m.0.cv2.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_19_conv_bias = (() => {
+    const sl = weights.getSlice('model.19.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const model_21_cv1_conv_bias = (() => {
+    const sl = weights.getSlice('model.21.cv1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [256] }, new Float32Array(buf));
+  })();
+  const model_21_cv2_conv_bias = (() => {
+    const sl = weights.getSlice('model.21.cv2.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [256] }, new Float32Array(buf));
+  })();
+  const model_21_m_0_cv1_conv_bias = (() => {
+    const sl = weights.getSlice('model.21.m.0.cv1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const model_21_m_0_cv2_conv_bias = (() => {
+    const sl = weights.getSlice('model.21.m.0.cv2.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128] }, new Float32Array(buf));
+  })();
+  const model_22_cv2_0_0_conv_bias = (() => {
+    const sl = weights.getSlice('model.22.cv2.0.0.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_22_cv2_0_1_conv_bias = (() => {
+    const sl = weights.getSlice('model.22.cv2.0.1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_22_cv2_0_2_bias = (() => {
+    const sl = weights.getSlice('model.22.cv2.0.2.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_22_cv2_1_0_conv_bias = (() => {
+    const sl = weights.getSlice('model.22.cv2.1.0.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_22_cv2_1_1_conv_bias = (() => {
+    const sl = weights.getSlice('model.22.cv2.1.1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_22_cv2_1_2_bias = (() => {
+    const sl = weights.getSlice('model.22.cv2.1.2.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_22_cv2_2_0_conv_bias = (() => {
+    const sl = weights.getSlice('model.22.cv2.2.0.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_22_cv2_2_1_conv_bias = (() => {
+    const sl = weights.getSlice('model.22.cv2.2.1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_22_cv2_2_2_bias = (() => {
+    const sl = weights.getSlice('model.22.cv2.2.2.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_22_cv3_0_0_conv_bias = (() => {
+    const sl = weights.getSlice('model.22.cv3.0.0.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_22_cv3_0_1_conv_bias = (() => {
+    const sl = weights.getSlice('model.22.cv3.0.1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_22_cv3_0_2_weight = (() => {
+    const sl = weights.getSlice('model.22.cv3.0.2.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,64,1,1] }, new Float32Array(buf));
+  })();
+  const model_22_cv3_0_2_bias = (() => {
+    const sl = weights.getSlice('model.22.cv3.0.2.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1] }, new Float32Array(buf));
+  })();
+  const model_22_cv3_1_0_conv_bias = (() => {
+    const sl = weights.getSlice('model.22.cv3.1.0.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_22_cv3_1_1_conv_bias = (() => {
+    const sl = weights.getSlice('model.22.cv3.1.1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_22_cv3_1_2_weight = (() => {
+    const sl = weights.getSlice('model.22.cv3.1.2.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,64,1,1] }, new Float32Array(buf));
+  })();
+  const model_22_cv3_1_2_bias = (() => {
+    const sl = weights.getSlice('model.22.cv3.1.2.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1] }, new Float32Array(buf));
+  })();
+  const model_22_cv3_2_0_conv_bias = (() => {
+    const sl = weights.getSlice('model.22.cv3.2.0.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_22_cv3_2_1_conv_bias = (() => {
+    const sl = weights.getSlice('model.22.cv3.2.1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64] }, new Float32Array(buf));
+  })();
+  const model_22_cv3_2_2_weight = (() => {
+    const sl = weights.getSlice('model.22.cv3.2.2.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1,64,1,1] }, new Float32Array(buf));
+  })();
+  const model_22_cv3_2_2_bias = (() => {
+    const sl = weights.getSlice('model.22.cv3.2.2.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [1] }, new Float32Array(buf));
+  })();
+  const model_22_cv4_0_0_conv_bias = (() => {
+    const sl = weights.getSlice('model.22.cv4.0.0.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16] }, new Float32Array(buf));
+  })();
+  const model_22_cv4_0_1_conv_bias = (() => {
+    const sl = weights.getSlice('model.22.cv4.0.1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16] }, new Float32Array(buf));
+  })();
+  const model_22_cv4_0_2_weight = (() => {
+    const sl = weights.getSlice('model.22.cv4.0.2.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [15,16,1,1] }, new Float32Array(buf));
+  })();
+  const model_22_cv4_0_2_bias = (() => {
+    const sl = weights.getSlice('model.22.cv4.0.2.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [15] }, new Float32Array(buf));
+  })();
+  const model_22_cv4_1_0_conv_bias = (() => {
+    const sl = weights.getSlice('model.22.cv4.1.0.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16] }, new Float32Array(buf));
+  })();
+  const model_22_cv4_1_1_conv_bias = (() => {
+    const sl = weights.getSlice('model.22.cv4.1.1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16] }, new Float32Array(buf));
+  })();
+  const model_22_cv4_1_2_weight = (() => {
+    const sl = weights.getSlice('model.22.cv4.1.2.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [15,16,1,1] }, new Float32Array(buf));
+  })();
+  const model_22_cv4_1_2_bias = (() => {
+    const sl = weights.getSlice('model.22.cv4.1.2.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [15] }, new Float32Array(buf));
+  })();
+  const model_22_cv4_2_0_conv_bias = (() => {
+    const sl = weights.getSlice('model.22.cv4.2.0.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16] }, new Float32Array(buf));
+  })();
+  const model_22_cv4_2_1_conv_bias = (() => {
+    const sl = weights.getSlice('model.22.cv4.2.1.conv.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16] }, new Float32Array(buf));
+  })();
+  const model_22_cv4_2_2_weight = (() => {
+    const sl = weights.getSlice('model.22.cv4.2.2.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [15,16,1,1] }, new Float32Array(buf));
+  })();
+  const model_22_cv4_2_2_bias = (() => {
+    const sl = weights.getSlice('model.22.cv4.2.2.bias');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [15] }, new Float32Array(buf));
+  })();
+  const model_1_conv_weight = (() => {
+    const sl = weights.getSlice('model.1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32,16,3,3] }, new Float32Array(buf));
+  })();
+  const model_2_cv1_conv_weight = (() => {
+    const sl = weights.getSlice('model.2.cv1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32,32,1,1] }, new Float32Array(buf));
+  })();
+  const model_2_cv2_conv_weight = (() => {
+    const sl = weights.getSlice('model.2.cv2.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32,48,1,1] }, new Float32Array(buf));
+  })();
+  const model_2_m_0_cv1_conv_weight = (() => {
+    const sl = weights.getSlice('model.2.m.0.cv1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16,16,3,3] }, new Float32Array(buf));
+  })();
+  const model_2_m_0_cv2_conv_weight = (() => {
+    const sl = weights.getSlice('model.2.m.0.cv2.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16,16,3,3] }, new Float32Array(buf));
+  })();
+  const model_3_conv_weight = (() => {
+    const sl = weights.getSlice('model.3.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,32,3,3] }, new Float32Array(buf));
+  })();
+  const model_4_cv1_conv_weight = (() => {
+    const sl = weights.getSlice('model.4.cv1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,64,1,1] }, new Float32Array(buf));
+  })();
+  const model_4_cv2_conv_weight = (() => {
+    const sl = weights.getSlice('model.4.cv2.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,128,1,1] }, new Float32Array(buf));
+  })();
+  const model_4_m_0_cv1_conv_weight = (() => {
+    const sl = weights.getSlice('model.4.m.0.cv1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32,32,3,3] }, new Float32Array(buf));
+  })();
+  const model_4_m_0_cv2_conv_weight = (() => {
+    const sl = weights.getSlice('model.4.m.0.cv2.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32,32,3,3] }, new Float32Array(buf));
+  })();
+  const model_4_m_1_cv1_conv_weight = (() => {
+    const sl = weights.getSlice('model.4.m.1.cv1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32,32,3,3] }, new Float32Array(buf));
+  })();
+  const model_4_m_1_cv2_conv_weight = (() => {
+    const sl = weights.getSlice('model.4.m.1.cv2.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32,32,3,3] }, new Float32Array(buf));
+  })();
+  const model_5_conv_weight = (() => {
+    const sl = weights.getSlice('model.5.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,64,3,3] }, new Float32Array(buf));
+  })();
+  const model_6_cv1_conv_weight = (() => {
+    const sl = weights.getSlice('model.6.cv1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,128,1,1] }, new Float32Array(buf));
+  })();
+  const model_6_cv2_conv_weight = (() => {
+    const sl = weights.getSlice('model.6.cv2.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,256,1,1] }, new Float32Array(buf));
+  })();
+  const model_6_m_0_cv1_conv_weight = (() => {
+    const sl = weights.getSlice('model.6.m.0.cv1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,64,3,3] }, new Float32Array(buf));
+  })();
+  const model_6_m_0_cv2_conv_weight = (() => {
+    const sl = weights.getSlice('model.6.m.0.cv2.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,64,3,3] }, new Float32Array(buf));
+  })();
+  const model_6_m_1_cv1_conv_weight = (() => {
+    const sl = weights.getSlice('model.6.m.1.cv1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,64,3,3] }, new Float32Array(buf));
+  })();
+  const model_6_m_1_cv2_conv_weight = (() => {
+    const sl = weights.getSlice('model.6.m.1.cv2.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,64,3,3] }, new Float32Array(buf));
+  })();
+  const model_7_conv_weight = (() => {
+    const sl = weights.getSlice('model.7.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [256,128,3,3] }, new Float32Array(buf));
+  })();
+  const model_8_cv1_conv_weight = (() => {
+    const sl = weights.getSlice('model.8.cv1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [256,256,1,1] }, new Float32Array(buf));
+  })();
+  const model_8_cv2_conv_weight = (() => {
+    const sl = weights.getSlice('model.8.cv2.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [256,384,1,1] }, new Float32Array(buf));
+  })();
+  const model_8_m_0_cv1_conv_weight = (() => {
+    const sl = weights.getSlice('model.8.m.0.cv1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,128,3,3] }, new Float32Array(buf));
+  })();
+  const model_8_m_0_cv2_conv_weight = (() => {
+    const sl = weights.getSlice('model.8.m.0.cv2.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,128,3,3] }, new Float32Array(buf));
+  })();
+  const model_9_cv1_conv_weight = (() => {
+    const sl = weights.getSlice('model.9.cv1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,256,1,1] }, new Float32Array(buf));
+  })();
+  const model_9_cv2_conv_weight = (() => {
+    const sl = weights.getSlice('model.9.cv2.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [256,512,1,1] }, new Float32Array(buf));
+  })();
+  const model_12_cv1_conv_weight = (() => {
+    const sl = weights.getSlice('model.12.cv1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,384,1,1] }, new Float32Array(buf));
+  })();
+  const model_12_cv2_conv_weight = (() => {
+    const sl = weights.getSlice('model.12.cv2.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,192,1,1] }, new Float32Array(buf));
+  })();
+  const model_12_m_0_cv1_conv_weight = (() => {
+    const sl = weights.getSlice('model.12.m.0.cv1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,64,3,3] }, new Float32Array(buf));
+  })();
+  const model_12_m_0_cv2_conv_weight = (() => {
+    const sl = weights.getSlice('model.12.m.0.cv2.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,64,3,3] }, new Float32Array(buf));
+  })();
+  const model_15_cv1_conv_weight = (() => {
+    const sl = weights.getSlice('model.15.cv1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,192,1,1] }, new Float32Array(buf));
+  })();
+  const model_15_cv2_conv_weight = (() => {
+    const sl = weights.getSlice('model.15.cv2.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,96,1,1] }, new Float32Array(buf));
+  })();
+  const model_15_m_0_cv1_conv_weight = (() => {
+    const sl = weights.getSlice('model.15.m.0.cv1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32,32,3,3] }, new Float32Array(buf));
+  })();
+  const model_15_m_0_cv2_conv_weight = (() => {
+    const sl = weights.getSlice('model.15.m.0.cv2.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [32,32,3,3] }, new Float32Array(buf));
+  })();
+  const model_16_conv_weight = (() => {
+    const sl = weights.getSlice('model.16.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,64,3,3] }, new Float32Array(buf));
+  })();
+  const model_18_cv1_conv_weight = (() => {
+    const sl = weights.getSlice('model.18.cv1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,192,1,1] }, new Float32Array(buf));
+  })();
+  const model_18_cv2_conv_weight = (() => {
+    const sl = weights.getSlice('model.18.cv2.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,192,1,1] }, new Float32Array(buf));
+  })();
+  const model_18_m_0_cv1_conv_weight = (() => {
+    const sl = weights.getSlice('model.18.m.0.cv1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,64,3,3] }, new Float32Array(buf));
+  })();
+  const model_18_m_0_cv2_conv_weight = (() => {
+    const sl = weights.getSlice('model.18.m.0.cv2.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,64,3,3] }, new Float32Array(buf));
+  })();
+  const model_19_conv_weight = (() => {
+    const sl = weights.getSlice('model.19.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,128,3,3] }, new Float32Array(buf));
+  })();
+  const model_21_cv1_conv_weight = (() => {
+    const sl = weights.getSlice('model.21.cv1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [256,384,1,1] }, new Float32Array(buf));
+  })();
+  const model_21_cv2_conv_weight = (() => {
+    const sl = weights.getSlice('model.21.cv2.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [256,384,1,1] }, new Float32Array(buf));
+  })();
+  const model_21_m_0_cv1_conv_weight = (() => {
+    const sl = weights.getSlice('model.21.m.0.cv1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,128,3,3] }, new Float32Array(buf));
+  })();
+  const model_21_m_0_cv2_conv_weight = (() => {
+    const sl = weights.getSlice('model.21.m.0.cv2.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [128,128,3,3] }, new Float32Array(buf));
+  })();
+  const model_22_cv2_0_0_conv_weight = (() => {
+    const sl = weights.getSlice('model.22.cv2.0.0.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,64,3,3] }, new Float32Array(buf));
+  })();
+  const model_22_cv2_0_1_conv_weight = (() => {
+    const sl = weights.getSlice('model.22.cv2.0.1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,64,3,3] }, new Float32Array(buf));
+  })();
+  const model_22_cv2_0_2_weight = (() => {
+    const sl = weights.getSlice('model.22.cv2.0.2.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,64,1,1] }, new Float32Array(buf));
+  })();
+  const model_22_cv2_1_0_conv_weight = (() => {
+    const sl = weights.getSlice('model.22.cv2.1.0.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,128,3,3] }, new Float32Array(buf));
+  })();
+  const model_22_cv2_1_1_conv_weight = (() => {
+    const sl = weights.getSlice('model.22.cv2.1.1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,64,3,3] }, new Float32Array(buf));
+  })();
+  const model_22_cv2_1_2_weight = (() => {
+    const sl = weights.getSlice('model.22.cv2.1.2.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,64,1,1] }, new Float32Array(buf));
+  })();
+  const model_22_cv2_2_0_conv_weight = (() => {
+    const sl = weights.getSlice('model.22.cv2.2.0.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,256,3,3] }, new Float32Array(buf));
+  })();
+  const model_22_cv2_2_1_conv_weight = (() => {
+    const sl = weights.getSlice('model.22.cv2.2.1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,64,3,3] }, new Float32Array(buf));
+  })();
+  const model_22_cv2_2_2_weight = (() => {
+    const sl = weights.getSlice('model.22.cv2.2.2.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,64,1,1] }, new Float32Array(buf));
+  })();
+  const model_22_cv3_0_0_conv_weight = (() => {
+    const sl = weights.getSlice('model.22.cv3.0.0.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,64,3,3] }, new Float32Array(buf));
+  })();
+  const model_22_cv3_0_1_conv_weight = (() => {
+    const sl = weights.getSlice('model.22.cv3.0.1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,64,3,3] }, new Float32Array(buf));
+  })();
+  const model_22_cv3_1_0_conv_weight = (() => {
+    const sl = weights.getSlice('model.22.cv3.1.0.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,128,3,3] }, new Float32Array(buf));
+  })();
+  const model_22_cv3_1_1_conv_weight = (() => {
+    const sl = weights.getSlice('model.22.cv3.1.1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,64,3,3] }, new Float32Array(buf));
+  })();
+  const model_22_cv3_2_0_conv_weight = (() => {
+    const sl = weights.getSlice('model.22.cv3.2.0.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,256,3,3] }, new Float32Array(buf));
+  })();
+  const model_22_cv3_2_1_conv_weight = (() => {
+    const sl = weights.getSlice('model.22.cv3.2.1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [64,64,3,3] }, new Float32Array(buf));
+  })();
+  const model_22_cv4_0_0_conv_weight = (() => {
+    const sl = weights.getSlice('model.22.cv4.0.0.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16,64,3,3] }, new Float32Array(buf));
+  })();
+  const model_22_cv4_0_1_conv_weight = (() => {
+    const sl = weights.getSlice('model.22.cv4.0.1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16,16,3,3] }, new Float32Array(buf));
+  })();
+  const model_22_cv4_1_0_conv_weight = (() => {
+    const sl = weights.getSlice('model.22.cv4.1.0.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16,128,3,3] }, new Float32Array(buf));
+  })();
+  const model_22_cv4_1_1_conv_weight = (() => {
+    const sl = weights.getSlice('model.22.cv4.1.1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16,16,3,3] }, new Float32Array(buf));
+  })();
+  const model_22_cv4_2_0_conv_weight = (() => {
+    const sl = weights.getSlice('model.22.cv4.2.0.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16,256,3,3] }, new Float32Array(buf));
+  })();
+  const model_22_cv4_2_1_conv_weight = (() => {
+    const sl = weights.getSlice('model.22.cv4.2.1.conv.weight');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'float32', shape: [16,16,3,3] }, new Float32Array(buf));
+  })();
+  const val_39 = (() => {
+    const sl = weights.getSlice('val_39');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'int64', shape: [4] }, new BigInt64Array(buf));
+  })();
+  const val_47 = (() => {
+    const sl = weights.getSlice('val_47');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'int64', shape: [4] }, new BigInt64Array(buf));
+  })();
+  const val_3 = (() => {
+    const sl = weights.getSlice('val_3');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'int64', shape: [2] }, new BigInt64Array(buf));
+  })();
+  const val_11 = (() => {
+    const sl = weights.getSlice('val_11');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'int64', shape: [2] }, new BigInt64Array(buf));
+  })();
+  const val_19 = (() => {
+    const sl = weights.getSlice('val_19');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'int64', shape: [2] }, new BigInt64Array(buf));
+  })();
+  const val_27 = (() => {
+    const sl = weights.getSlice('val_27');
+    const buf = weights.buffer.slice(sl.byteOffset, sl.byteOffset + sl.byteLength);
+    return builder.constant({ dataType: 'int64', shape: [2] }, new BigInt64Array(buf));
+  })();
+
+  // Graph operations
+  // Conv
+  const conv2d = builder.conv2d(images, model_0_conv_weight, { padding: [1, 1, 1, 1], strides: [2, 2], bias: model_0_conv_bias });
+  // Sigmoid
+  const val_0 = builder.sigmoid(conv2d);
+  // Mul
+  const silu = builder.mul(conv2d, val_0);
+  // Conv
+  const conv2d_1 = builder.conv2d(silu, model_1_conv_weight, { padding: [1, 1, 1, 1], strides: [2, 2], bias: model_1_conv_bias });
+  // Sigmoid
+  const val_1 = builder.sigmoid(conv2d_1);
+  // Mul
+  const silu_1 = builder.mul(conv2d_1, val_1);
+  // Conv
+  const conv2d_2 = builder.conv2d(silu_1, model_2_cv1_conv_weight, { padding: [0, 0, 0, 0], bias: model_2_cv1_conv_bias });
+  // Sigmoid
+  const val_2 = builder.sigmoid(conv2d_2);
+  // Mul
+  const silu_2 = builder.mul(conv2d_2, val_2);
+  // Split
+  const split_with_sizes_1_split_0_splits = builder.split(silu_2, [16, 16], { axis: 1 });
+  const split_with_sizes_1_split_0 = split_with_sizes_1_split_0_splits[0];
+  const split_with_sizes_1_split_1 = split_with_sizes_1_split_0_splits[1];
+  // Conv
+  const conv2d_3 = builder.conv2d(split_with_sizes_1_split_1, model_2_m_0_cv1_conv_weight, { padding: [1, 1, 1, 1], bias: model_2_m_0_cv1_conv_bias });
+  // Sigmoid
+  const val_5 = builder.sigmoid(conv2d_3);
+  // Mul
+  const silu_3 = builder.mul(conv2d_3, val_5);
+  // Conv
+  const conv2d_4 = builder.conv2d(silu_3, model_2_m_0_cv2_conv_weight, { padding: [1, 1, 1, 1], bias: model_2_m_0_cv2_conv_bias });
+  // Sigmoid
+  const val_6 = builder.sigmoid(conv2d_4);
+  // Mul
+  const silu_4 = builder.mul(conv2d_4, val_6);
+  // Add
+  const add = builder.add(split_with_sizes_1_split_1, silu_4);
+  // Concat
+  const cat = builder.concat([split_with_sizes_1_split_0, split_with_sizes_1_split_1, add], 1);
+  // Conv
+  const conv2d_5 = builder.conv2d(cat, model_2_cv2_conv_weight, { padding: [0, 0, 0, 0], bias: model_2_cv2_conv_bias });
+  // Sigmoid
+  const val_8 = builder.sigmoid(conv2d_5);
+  // Mul
+  const silu_5 = builder.mul(conv2d_5, val_8);
+  // Conv
+  const conv2d_6 = builder.conv2d(silu_5, model_3_conv_weight, { padding: [1, 1, 1, 1], strides: [2, 2], bias: model_3_conv_bias });
+  // Sigmoid
+  const val_9 = builder.sigmoid(conv2d_6);
+  // Mul
+  const silu_6 = builder.mul(conv2d_6, val_9);
+  // Conv
+  const conv2d_7 = builder.conv2d(silu_6, model_4_cv1_conv_weight, { padding: [0, 0, 0, 0], bias: model_4_cv1_conv_bias });
+  // Sigmoid
+  const val_10 = builder.sigmoid(conv2d_7);
+  // Mul
+  const silu_7 = builder.mul(conv2d_7, val_10);
+  // Split
+  const split_with_sizes_4_split_0_splits = builder.split(silu_7, [32, 32], { axis: 1 });
+  const split_with_sizes_4_split_0 = split_with_sizes_4_split_0_splits[0];
+  const split_with_sizes_4_split_1 = split_with_sizes_4_split_0_splits[1];
+  // Conv
+  const conv2d_8 = builder.conv2d(split_with_sizes_4_split_1, model_4_m_0_cv1_conv_weight, { padding: [1, 1, 1, 1], bias: model_4_m_0_cv1_conv_bias });
+  // Sigmoid
+  const val_12 = builder.sigmoid(conv2d_8);
+  // Mul
+  const silu_8 = builder.mul(conv2d_8, val_12);
+  // Conv
+  const conv2d_9 = builder.conv2d(silu_8, model_4_m_0_cv2_conv_weight, { padding: [1, 1, 1, 1], bias: model_4_m_0_cv2_conv_bias });
+  // Sigmoid
+  const val_13 = builder.sigmoid(conv2d_9);
+  // Mul
+  const silu_9 = builder.mul(conv2d_9, val_13);
+  // Add
+  const add_1 = builder.add(split_with_sizes_4_split_1, silu_9);
+  // Conv
+  const conv2d_10 = builder.conv2d(add_1, model_4_m_1_cv1_conv_weight, { padding: [1, 1, 1, 1], bias: model_4_m_1_cv1_conv_bias });
+  // Sigmoid
+  const val_14 = builder.sigmoid(conv2d_10);
+  // Mul
+  const silu_10 = builder.mul(conv2d_10, val_14);
+  // Conv
+  const conv2d_11 = builder.conv2d(silu_10, model_4_m_1_cv2_conv_weight, { padding: [1, 1, 1, 1], bias: model_4_m_1_cv2_conv_bias });
+  // Sigmoid
+  const val_15 = builder.sigmoid(conv2d_11);
+  // Mul
+  const silu_11 = builder.mul(conv2d_11, val_15);
+  // Add
+  const add_2 = builder.add(add_1, silu_11);
+  // Concat
+  const cat_1 = builder.concat([split_with_sizes_4_split_0, split_with_sizes_4_split_1, add_1, add_2], 1);
+  // Conv
+  const conv2d_12 = builder.conv2d(cat_1, model_4_cv2_conv_weight, { padding: [0, 0, 0, 0], bias: model_4_cv2_conv_bias });
+  // Sigmoid
+  const val_16 = builder.sigmoid(conv2d_12);
+  // Mul
+  const silu_12 = builder.mul(conv2d_12, val_16);
+  // Conv
+  const conv2d_13 = builder.conv2d(silu_12, model_5_conv_weight, { padding: [1, 1, 1, 1], strides: [2, 2], bias: model_5_conv_bias });
+  // Sigmoid
+  const val_17 = builder.sigmoid(conv2d_13);
+  // Mul
+  const silu_13 = builder.mul(conv2d_13, val_17);
+  // Conv
+  const conv2d_14 = builder.conv2d(silu_13, model_6_cv1_conv_weight, { padding: [0, 0, 0, 0], bias: model_6_cv1_conv_bias });
+  // Sigmoid
+  const val_18 = builder.sigmoid(conv2d_14);
+  // Mul
+  const silu_14 = builder.mul(conv2d_14, val_18);
+  // Split
+  const split_with_sizes_7_split_0_splits = builder.split(silu_14, [64, 64], { axis: 1 });
+  const split_with_sizes_7_split_0 = split_with_sizes_7_split_0_splits[0];
+  const split_with_sizes_7_split_1 = split_with_sizes_7_split_0_splits[1];
+  // Conv
+  const conv2d_15 = builder.conv2d(split_with_sizes_7_split_1, model_6_m_0_cv1_conv_weight, { padding: [1, 1, 1, 1], bias: model_6_m_0_cv1_conv_bias });
+  // Sigmoid
+  const val_20 = builder.sigmoid(conv2d_15);
+  // Mul
+  const silu_15 = builder.mul(conv2d_15, val_20);
+  // Conv
+  const conv2d_16 = builder.conv2d(silu_15, model_6_m_0_cv2_conv_weight, { padding: [1, 1, 1, 1], bias: model_6_m_0_cv2_conv_bias });
+  // Sigmoid
+  const val_21 = builder.sigmoid(conv2d_16);
+  // Mul
+  const silu_16 = builder.mul(conv2d_16, val_21);
+  // Add
+  const add_3 = builder.add(split_with_sizes_7_split_1, silu_16);
+  // Conv
+  const conv2d_17 = builder.conv2d(add_3, model_6_m_1_cv1_conv_weight, { padding: [1, 1, 1, 1], bias: model_6_m_1_cv1_conv_bias });
+  // Sigmoid
+  const val_22 = builder.sigmoid(conv2d_17);
+  // Mul
+  const silu_17 = builder.mul(conv2d_17, val_22);
+  // Conv
+  const conv2d_18 = builder.conv2d(silu_17, model_6_m_1_cv2_conv_weight, { padding: [1, 1, 1, 1], bias: model_6_m_1_cv2_conv_bias });
+  // Sigmoid
+  const val_23 = builder.sigmoid(conv2d_18);
+  // Mul
+  const silu_18 = builder.mul(conv2d_18, val_23);
+  // Add
+  const add_4 = builder.add(add_3, silu_18);
+  // Concat
+  const cat_2 = builder.concat([split_with_sizes_7_split_0, split_with_sizes_7_split_1, add_3, add_4], 1);
+  // Conv
+  const conv2d_19 = builder.conv2d(cat_2, model_6_cv2_conv_weight, { padding: [0, 0, 0, 0], bias: model_6_cv2_conv_bias });
+  // Sigmoid
+  const val_24 = builder.sigmoid(conv2d_19);
+  // Mul
+  const silu_19 = builder.mul(conv2d_19, val_24);
+  // Conv
+  const conv2d_20 = builder.conv2d(silu_19, model_7_conv_weight, { padding: [1, 1, 1, 1], strides: [2, 2], bias: model_7_conv_bias });
+  // Sigmoid
+  const val_25 = builder.sigmoid(conv2d_20);
+  // Mul
+  const silu_20 = builder.mul(conv2d_20, val_25);
+  // Conv
+  const conv2d_21 = builder.conv2d(silu_20, model_8_cv1_conv_weight, { padding: [0, 0, 0, 0], bias: model_8_cv1_conv_bias });
+  // Sigmoid
+  const val_26 = builder.sigmoid(conv2d_21);
+  // Mul
+  const silu_21 = builder.mul(conv2d_21, val_26);
+  // Split
+  const split_with_sizes_10_split_0_splits = builder.split(silu_21, [128, 128], { axis: 1 });
+  const split_with_sizes_10_split_0 = split_with_sizes_10_split_0_splits[0];
+  const split_with_sizes_10_split_1 = split_with_sizes_10_split_0_splits[1];
+  // Conv
+  const conv2d_22 = builder.conv2d(split_with_sizes_10_split_1, model_8_m_0_cv1_conv_weight, { padding: [1, 1, 1, 1], bias: model_8_m_0_cv1_conv_bias });
+  // Sigmoid
+  const val_28 = builder.sigmoid(conv2d_22);
+  // Mul
+  const silu_22 = builder.mul(conv2d_22, val_28);
+  // Conv
+  const conv2d_23 = builder.conv2d(silu_22, model_8_m_0_cv2_conv_weight, { padding: [1, 1, 1, 1], bias: model_8_m_0_cv2_conv_bias });
+  // Sigmoid
+  const val_29 = builder.sigmoid(conv2d_23);
+  // Mul
+  const silu_23 = builder.mul(conv2d_23, val_29);
+  // Add
+  const add_5 = builder.add(split_with_sizes_10_split_1, silu_23);
+  // Concat
+  const cat_3 = builder.concat([split_with_sizes_10_split_0, split_with_sizes_10_split_1, add_5], 1);
+  // Conv
+  const conv2d_24 = builder.conv2d(cat_3, model_8_cv2_conv_weight, { padding: [0, 0, 0, 0], bias: model_8_cv2_conv_bias });
+  // Sigmoid
+  const val_30 = builder.sigmoid(conv2d_24);
+  // Mul
+  const silu_24 = builder.mul(conv2d_24, val_30);
+  // Conv
+  const conv2d_25 = builder.conv2d(silu_24, model_9_cv1_conv_weight, { padding: [0, 0, 0, 0], bias: model_9_cv1_conv_bias });
+  // Sigmoid
+  const val_31 = builder.sigmoid(conv2d_25);
+  // Mul
+  const silu_25 = builder.mul(conv2d_25, val_31);
+  // MaxPool
+  const max_pool2d = builder.maxPool2d(silu_25, { windowDimensions: [5, 5], padding: [2, 2, 2, 2] });
+  // MaxPool
+  const max_pool2d_1 = builder.maxPool2d(max_pool2d, { windowDimensions: [5, 5], padding: [2, 2, 2, 2] });
+  // MaxPool
+  const max_pool2d_2 = builder.maxPool2d(max_pool2d_1, { windowDimensions: [5, 5], padding: [2, 2, 2, 2] });
+  // Concat
+  const cat_4 = builder.concat([silu_25, max_pool2d, max_pool2d_1, max_pool2d_2], 1);
+  // Conv
+  const conv2d_26 = builder.conv2d(cat_4, model_9_cv2_conv_weight, { padding: [0, 0, 0, 0], bias: model_9_cv2_conv_bias });
+  // Sigmoid
+  const val_35 = builder.sigmoid(conv2d_26);
+  // Mul
+  const silu_26 = builder.mul(conv2d_26, val_35);
+  // Resize
+  const upsample_nearest2d = builder.resample2d(silu_26, { mode: 'nearest-neighbor', sizes: [40, 40], axes: [2, 3] });
+  // Concat
+  const cat_5 = builder.concat([upsample_nearest2d, silu_19], 1);
+  // Conv
+  const conv2d_27 = builder.conv2d(cat_5, model_12_cv1_conv_weight, { padding: [0, 0, 0, 0], bias: model_12_cv1_conv_bias });
+  // Sigmoid
+  const val_40 = builder.sigmoid(conv2d_27);
+  // Mul
+  const silu_27 = builder.mul(conv2d_27, val_40);
+  // Split
+  const split_with_sizes_13_split_0_splits = builder.split(silu_27, [64, 64], { axis: 1 });
+  const split_with_sizes_13_split_0 = split_with_sizes_13_split_0_splits[0];
+  const split_with_sizes_13_split_1 = split_with_sizes_13_split_0_splits[1];
+  // Conv
+  const conv2d_28 = builder.conv2d(split_with_sizes_13_split_1, model_12_m_0_cv1_conv_weight, { padding: [1, 1, 1, 1], bias: model_12_m_0_cv1_conv_bias });
+  // Sigmoid
+  const val_41 = builder.sigmoid(conv2d_28);
+  // Mul
+  const silu_28 = builder.mul(conv2d_28, val_41);
+  // Conv
+  const conv2d_29 = builder.conv2d(silu_28, model_12_m_0_cv2_conv_weight, { padding: [1, 1, 1, 1], bias: model_12_m_0_cv2_conv_bias });
+  // Sigmoid
+  const val_42 = builder.sigmoid(conv2d_29);
+  // Mul
+  const silu_29 = builder.mul(conv2d_29, val_42);
+  // Concat
+  const cat_6 = builder.concat([split_with_sizes_13_split_0, split_with_sizes_13_split_1, silu_29], 1);
+  // Conv
+  const conv2d_30 = builder.conv2d(cat_6, model_12_cv2_conv_weight, { padding: [0, 0, 0, 0], bias: model_12_cv2_conv_bias });
+  // Sigmoid
+  const val_43 = builder.sigmoid(conv2d_30);
+  // Mul
+  const silu_30 = builder.mul(conv2d_30, val_43);
+  // Resize
+  const upsample_nearest2d_1 = builder.resample2d(silu_30, { mode: 'nearest-neighbor', sizes: [80, 80], axes: [2, 3] });
+  // Concat
+  const cat_7 = builder.concat([upsample_nearest2d_1, silu_12], 1);
+  // Conv
+  const conv2d_31 = builder.conv2d(cat_7, model_15_cv1_conv_weight, { padding: [0, 0, 0, 0], bias: model_15_cv1_conv_bias });
+  // Sigmoid
+  const val_48 = builder.sigmoid(conv2d_31);
+  // Mul
+  const silu_31 = builder.mul(conv2d_31, val_48);
+  // Split
+  const split_with_sizes_16_split_0_splits = builder.split(silu_31, [32, 32], { axis: 1 });
+  const split_with_sizes_16_split_0 = split_with_sizes_16_split_0_splits[0];
+  const split_with_sizes_16_split_1 = split_with_sizes_16_split_0_splits[1];
+  // Conv
+  const conv2d_32 = builder.conv2d(split_with_sizes_16_split_1, model_15_m_0_cv1_conv_weight, { padding: [1, 1, 1, 1], bias: model_15_m_0_cv1_conv_bias });
+  // Sigmoid
+  const val_49 = builder.sigmoid(conv2d_32);
+  // Mul
+  const silu_32 = builder.mul(conv2d_32, val_49);
+  // Conv
+  const conv2d_33 = builder.conv2d(silu_32, model_15_m_0_cv2_conv_weight, { padding: [1, 1, 1, 1], bias: model_15_m_0_cv2_conv_bias });
+  // Sigmoid
+  const val_50 = builder.sigmoid(conv2d_33);
+  // Mul
+  const silu_33 = builder.mul(conv2d_33, val_50);
+  // Concat
+  const cat_8 = builder.concat([split_with_sizes_16_split_0, split_with_sizes_16_split_1, silu_33], 1);
+  // Conv
+  const conv2d_34 = builder.conv2d(cat_8, model_15_cv2_conv_weight, { padding: [0, 0, 0, 0], bias: model_15_cv2_conv_bias });
+  // Sigmoid
+  const val_51 = builder.sigmoid(conv2d_34);
+  // Mul
+  const silu_34 = builder.mul(conv2d_34, val_51);
+  // Conv
+  const conv2d_35 = builder.conv2d(silu_34, model_16_conv_weight, { padding: [1, 1, 1, 1], strides: [2, 2], bias: model_16_conv_bias });
+  // Sigmoid
+  const val_52 = builder.sigmoid(conv2d_35);
+  // Mul
+  const silu_35 = builder.mul(conv2d_35, val_52);
+  // Concat
+  const cat_9 = builder.concat([silu_35, silu_30], 1);
+  // Conv
+  const conv2d_36 = builder.conv2d(cat_9, model_18_cv1_conv_weight, { padding: [0, 0, 0, 0], bias: model_18_cv1_conv_bias });
+  // Sigmoid
+  const val_53 = builder.sigmoid(conv2d_36);
+  // Mul
+  const silu_36 = builder.mul(conv2d_36, val_53);
+  // Split
+  const split_with_sizes_19_split_0_splits = builder.split(silu_36, [64, 64], { axis: 1 });
+  const split_with_sizes_19_split_0 = split_with_sizes_19_split_0_splits[0];
+  const split_with_sizes_19_split_1 = split_with_sizes_19_split_0_splits[1];
+  // Conv
+  const conv2d_37 = builder.conv2d(split_with_sizes_19_split_1, model_18_m_0_cv1_conv_weight, { padding: [1, 1, 1, 1], bias: model_18_m_0_cv1_conv_bias });
+  // Sigmoid
+  const val_54 = builder.sigmoid(conv2d_37);
+  // Mul
+  const silu_37 = builder.mul(conv2d_37, val_54);
+  // Conv
+  const conv2d_38 = builder.conv2d(silu_37, model_18_m_0_cv2_conv_weight, { padding: [1, 1, 1, 1], bias: model_18_m_0_cv2_conv_bias });
+  // Sigmoid
+  const val_55 = builder.sigmoid(conv2d_38);
+  // Mul
+  const silu_38 = builder.mul(conv2d_38, val_55);
+  // Concat
+  const cat_10 = builder.concat([split_with_sizes_19_split_0, split_with_sizes_19_split_1, silu_38], 1);
+  // Conv
+  const conv2d_39 = builder.conv2d(cat_10, model_18_cv2_conv_weight, { padding: [0, 0, 0, 0], bias: model_18_cv2_conv_bias });
+  // Sigmoid
+  const val_56 = builder.sigmoid(conv2d_39);
+  // Mul
+  const silu_39 = builder.mul(conv2d_39, val_56);
+  // Conv
+  const conv2d_40 = builder.conv2d(silu_39, model_19_conv_weight, { padding: [1, 1, 1, 1], strides: [2, 2], bias: model_19_conv_bias });
+  // Sigmoid
+  const val_57 = builder.sigmoid(conv2d_40);
+  // Mul
+  const silu_40 = builder.mul(conv2d_40, val_57);
+  // Concat
+  const cat_11 = builder.concat([silu_40, silu_26], 1);
+  // Conv
+  const conv2d_41 = builder.conv2d(cat_11, model_21_cv1_conv_weight, { padding: [0, 0, 0, 0], bias: model_21_cv1_conv_bias });
+  // Sigmoid
+  const val_58 = builder.sigmoid(conv2d_41);
+  // Mul
+  const silu_41 = builder.mul(conv2d_41, val_58);
+  // Split
+  const split_with_sizes_22_split_0_splits = builder.split(silu_41, [128, 128], { axis: 1 });
+  const split_with_sizes_22_split_0 = split_with_sizes_22_split_0_splits[0];
+  const split_with_sizes_22_split_1 = split_with_sizes_22_split_0_splits[1];
+  // Conv
+  const conv2d_42 = builder.conv2d(split_with_sizes_22_split_1, model_21_m_0_cv1_conv_weight, { padding: [1, 1, 1, 1], bias: model_21_m_0_cv1_conv_bias });
+  // Sigmoid
+  const val_59 = builder.sigmoid(conv2d_42);
+  // Mul
+  const silu_42 = builder.mul(conv2d_42, val_59);
+  // Conv
+  const conv2d_43 = builder.conv2d(silu_42, model_21_m_0_cv2_conv_weight, { padding: [1, 1, 1, 1], bias: model_21_m_0_cv2_conv_bias });
+  // Sigmoid
+  const val_60 = builder.sigmoid(conv2d_43);
+  // Mul
+  const silu_43 = builder.mul(conv2d_43, val_60);
+  // Concat
+  const cat_12 = builder.concat([split_with_sizes_22_split_0, split_with_sizes_22_split_1, silu_43], 1);
+  // Conv
+  const conv2d_44 = builder.conv2d(cat_12, model_21_cv2_conv_weight, { padding: [0, 0, 0, 0], bias: model_21_cv2_conv_bias });
+  // Sigmoid
+  const val_61 = builder.sigmoid(conv2d_44);
+  // Mul
+  const silu_44 = builder.mul(conv2d_44, val_61);
+  // Conv
+  const conv2d_45 = builder.conv2d(silu_34, model_22_cv2_0_0_conv_weight, { padding: [1, 1, 1, 1], bias: model_22_cv2_0_0_conv_bias });
+  // Sigmoid
+  const val_62 = builder.sigmoid(conv2d_45);
+  // Mul
+  const silu_45 = builder.mul(conv2d_45, val_62);
+  // Conv
+  const conv2d_46 = builder.conv2d(silu_45, model_22_cv2_0_1_conv_weight, { padding: [1, 1, 1, 1], bias: model_22_cv2_0_1_conv_bias });
+  // Sigmoid
+  const val_63 = builder.sigmoid(conv2d_46);
+  // Mul
+  const silu_46 = builder.mul(conv2d_46, val_63);
+  // Conv
+  const conv2d_47 = builder.conv2d(silu_46, model_22_cv2_0_2_weight, { padding: [0, 0, 0, 0], bias: model_22_cv2_0_2_bias });
+  // Conv
+  const conv2d_48 = builder.conv2d(silu_34, model_22_cv3_0_0_conv_weight, { padding: [1, 1, 1, 1], bias: model_22_cv3_0_0_conv_bias });
+  // Sigmoid
+  const val_64 = builder.sigmoid(conv2d_48);
+  // Mul
+  const silu_47 = builder.mul(conv2d_48, val_64);
+  // Conv
+  const conv2d_49 = builder.conv2d(silu_47, model_22_cv3_0_1_conv_weight, { padding: [1, 1, 1, 1], bias: model_22_cv3_0_1_conv_bias });
+  // Sigmoid
+  const val_65 = builder.sigmoid(conv2d_49);
+  // Mul
+  const silu_48 = builder.mul(conv2d_49, val_65);
+  // Conv
+  const conv2d_50 = builder.conv2d(silu_48, model_22_cv3_0_2_weight, { padding: [0, 0, 0, 0], bias: model_22_cv3_0_2_bias });
+  // Conv
+  const conv2d_51 = builder.conv2d(silu_39, model_22_cv2_1_0_conv_weight, { padding: [1, 1, 1, 1], bias: model_22_cv2_1_0_conv_bias });
+  // Sigmoid
+  const val_66 = builder.sigmoid(conv2d_51);
+  // Mul
+  const silu_49 = builder.mul(conv2d_51, val_66);
+  // Conv
+  const conv2d_52 = builder.conv2d(silu_49, model_22_cv2_1_1_conv_weight, { padding: [1, 1, 1, 1], bias: model_22_cv2_1_1_conv_bias });
+  // Sigmoid
+  const val_67 = builder.sigmoid(conv2d_52);
+  // Mul
+  const silu_50 = builder.mul(conv2d_52, val_67);
+  // Conv
+  const conv2d_53 = builder.conv2d(silu_50, model_22_cv2_1_2_weight, { padding: [0, 0, 0, 0], bias: model_22_cv2_1_2_bias });
+  // Conv
+  const conv2d_54 = builder.conv2d(silu_39, model_22_cv3_1_0_conv_weight, { padding: [1, 1, 1, 1], bias: model_22_cv3_1_0_conv_bias });
+  // Sigmoid
+  const val_68 = builder.sigmoid(conv2d_54);
+  // Mul
+  const silu_51 = builder.mul(conv2d_54, val_68);
+  // Conv
+  const conv2d_55 = builder.conv2d(silu_51, model_22_cv3_1_1_conv_weight, { padding: [1, 1, 1, 1], bias: model_22_cv3_1_1_conv_bias });
+  // Sigmoid
+  const val_69 = builder.sigmoid(conv2d_55);
+  // Mul
+  const silu_52 = builder.mul(conv2d_55, val_69);
+  // Conv
+  const conv2d_56 = builder.conv2d(silu_52, model_22_cv3_1_2_weight, { padding: [0, 0, 0, 0], bias: model_22_cv3_1_2_bias });
+  // Conv
+  const conv2d_57 = builder.conv2d(silu_44, model_22_cv2_2_0_conv_weight, { padding: [1, 1, 1, 1], bias: model_22_cv2_2_0_conv_bias });
+  // Sigmoid
+  const val_70 = builder.sigmoid(conv2d_57);
+  // Mul
+  const silu_53 = builder.mul(conv2d_57, val_70);
+  // Conv
+  const conv2d_58 = builder.conv2d(silu_53, model_22_cv2_2_1_conv_weight, { padding: [1, 1, 1, 1], bias: model_22_cv2_2_1_conv_bias });
+  // Sigmoid
+  const val_71 = builder.sigmoid(conv2d_58);
+  // Mul
+  const silu_54 = builder.mul(conv2d_58, val_71);
+  // Conv
+  const conv2d_59 = builder.conv2d(silu_54, model_22_cv2_2_2_weight, { padding: [0, 0, 0, 0], bias: model_22_cv2_2_2_bias });
+  // Conv
+  const conv2d_60 = builder.conv2d(silu_44, model_22_cv3_2_0_conv_weight, { padding: [1, 1, 1, 1], bias: model_22_cv3_2_0_conv_bias });
+  // Sigmoid
+  const val_72 = builder.sigmoid(conv2d_60);
+  // Mul
+  const silu_55 = builder.mul(conv2d_60, val_72);
+  // Conv
+  const conv2d_61 = builder.conv2d(silu_55, model_22_cv3_2_1_conv_weight, { padding: [1, 1, 1, 1], bias: model_22_cv3_2_1_conv_bias });
+  // Sigmoid
+  const val_73 = builder.sigmoid(conv2d_61);
+  // Mul
+  const silu_56 = builder.mul(conv2d_61, val_73);
+  // Conv
+  const conv2d_62 = builder.conv2d(silu_56, model_22_cv3_2_2_weight, { padding: [0, 0, 0, 0], bias: model_22_cv3_2_2_bias });
+  // Conv
+  const conv2d_63 = builder.conv2d(silu_34, model_22_cv4_0_0_conv_weight, { padding: [1, 1, 1, 1], bias: model_22_cv4_0_0_conv_bias });
+  // Sigmoid
+  const val_74 = builder.sigmoid(conv2d_63);
+  // Mul
+  const silu_57 = builder.mul(conv2d_63, val_74);
+  // Conv
+  const conv2d_64 = builder.conv2d(silu_57, model_22_cv4_0_1_conv_weight, { padding: [1, 1, 1, 1], bias: model_22_cv4_0_1_conv_bias });
+  // Sigmoid
+  const val_75 = builder.sigmoid(conv2d_64);
+  // Mul
+  const silu_58 = builder.mul(conv2d_64, val_75);
+  // Conv
+  const conv2d_65 = builder.conv2d(silu_58, model_22_cv4_0_2_weight, { padding: [0, 0, 0, 0], bias: model_22_cv4_0_2_bias });
+  // Concat
+  const output0 = builder.concat([conv2d_47, conv2d_50, conv2d_65], 1);
+  // Conv
+  const conv2d_66 = builder.conv2d(silu_39, model_22_cv4_1_0_conv_weight, { padding: [1, 1, 1, 1], bias: model_22_cv4_1_0_conv_bias });
+  // Sigmoid
+  const val_76 = builder.sigmoid(conv2d_66);
+  // Mul
+  const silu_59 = builder.mul(conv2d_66, val_76);
+  // Conv
+  const conv2d_67 = builder.conv2d(silu_59, model_22_cv4_1_1_conv_weight, { padding: [1, 1, 1, 1], bias: model_22_cv4_1_1_conv_bias });
+  // Sigmoid
+  const val_77 = builder.sigmoid(conv2d_67);
+  // Mul
+  const silu_60 = builder.mul(conv2d_67, val_77);
+  // Conv
+  const conv2d_68 = builder.conv2d(silu_60, model_22_cv4_1_2_weight, { padding: [0, 0, 0, 0], bias: model_22_cv4_1_2_bias });
+  // Concat
+  const cat_17 = builder.concat([conv2d_53, conv2d_56, conv2d_68], 1);
+  // Conv
+  const conv2d_69 = builder.conv2d(silu_44, model_22_cv4_2_0_conv_weight, { padding: [1, 1, 1, 1], bias: model_22_cv4_2_0_conv_bias });
+  // Sigmoid
+  const val_78 = builder.sigmoid(conv2d_69);
+  // Mul
+  const silu_61 = builder.mul(conv2d_69, val_78);
+  // Conv
+  const conv2d_70 = builder.conv2d(silu_61, model_22_cv4_2_1_conv_weight, { padding: [1, 1, 1, 1], bias: model_22_cv4_2_1_conv_bias });
+  // Sigmoid
+  const val_79 = builder.sigmoid(conv2d_70);
+  // Mul
+  const silu_62 = builder.mul(conv2d_70, val_79);
+  // Conv
+  const conv2d_71 = builder.conv2d(silu_62, model_22_cv4_2_2_weight, { padding: [0, 0, 0, 0], bias: model_22_cv4_2_2_bias });
+  // Concat
+  const cat_18 = builder.concat([conv2d_59, conv2d_62, conv2d_71], 1);
+
+  // Build graph
+  const namedOutputs = {};
+  namedOutputs['output0'] = output0;
+  namedOutputs['cat_17'] = cat_17;
+  namedOutputs['cat_18'] = cat_18;
+  // Capture actual output operand shapes (may differ from metadata for dynamic models)
+  const outputShapes = {};
+  for (const [name, operand] of Object.entries(namedOutputs)) {
+    outputShapes[name] = Array.from(operand.shape);
+  }
+  return { graph: await builder.build(namedOutputs), outputShapes };
+}
+
+async function buildDFLGraph(context) {
+  const builder = new MLGraphBuilder(context);
+
+  const dflWeight = builder.constant(
+    { dataType: 'float32', shape: [1, 16, 1, 1] },
+    new Float32Array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
+  );
+
+  const in0 = builder.input('in0', { dataType: 'float32', shape: [1, 80, 80, 80] });
+  const in1 = builder.input('in1', { dataType: 'float32', shape: [1, 80, 40, 40] });
+  const in2 = builder.input('in2', { dataType: 'float32', shape: [1, 80, 20, 20] });
+
+  // Scale 0: stride 8
+  const s0_bbox = builder.slice(in0, [0, 0, 0, 0], [1, 64, 80, 80]);
+  const s0_cls  = builder.slice(in0, [0, 64, 0, 0], [1,  1, 80, 80]);
+  const s0_kpts = builder.slice(in0, [0, 65, 0, 0], [1, 15, 80, 80]);
+  const s0_left   = builder.reduceSum(builder.mul(builder.softmax(builder.slice(s0_bbox, [0,  0, 0, 0], [1, 16, 80, 80]), 1), dflWeight), { axes: [1], keepDimensions: true });
+  const s0_top    = builder.reduceSum(builder.mul(builder.softmax(builder.slice(s0_bbox, [0, 16, 0, 0], [1, 16, 80, 80]), 1), dflWeight), { axes: [1], keepDimensions: true });
+  const s0_right  = builder.reduceSum(builder.mul(builder.softmax(builder.slice(s0_bbox, [0, 32, 0, 0], [1, 16, 80, 80]), 1), dflWeight), { axes: [1], keepDimensions: true });
+  const s0_bottom = builder.reduceSum(builder.mul(builder.softmax(builder.slice(s0_bbox, [0, 48, 0, 0], [1, 16, 80, 80]), 1), dflWeight), { axes: [1], keepDimensions: true });
+  const dfl0 = builder.concat([s0_left, s0_top, s0_right, s0_bottom, s0_cls, s0_kpts], 1);
+
+  // Scale 1: stride 16
+  const s1_bbox = builder.slice(in1, [0, 0, 0, 0], [1, 64, 40, 40]);
+  const s1_cls  = builder.slice(in1, [0, 64, 0, 0], [1,  1, 40, 40]);
+  const s1_kpts = builder.slice(in1, [0, 65, 0, 0], [1, 15, 40, 40]);
+  const s1_left   = builder.reduceSum(builder.mul(builder.softmax(builder.slice(s1_bbox, [0,  0, 0, 0], [1, 16, 40, 40]), 1), dflWeight), { axes: [1], keepDimensions: true });
+  const s1_top    = builder.reduceSum(builder.mul(builder.softmax(builder.slice(s1_bbox, [0, 16, 0, 0], [1, 16, 40, 40]), 1), dflWeight), { axes: [1], keepDimensions: true });
+  const s1_right  = builder.reduceSum(builder.mul(builder.softmax(builder.slice(s1_bbox, [0, 32, 0, 0], [1, 16, 40, 40]), 1), dflWeight), { axes: [1], keepDimensions: true });
+  const s1_bottom = builder.reduceSum(builder.mul(builder.softmax(builder.slice(s1_bbox, [0, 48, 0, 0], [1, 16, 40, 40]), 1), dflWeight), { axes: [1], keepDimensions: true });
+  const dfl17 = builder.concat([s1_left, s1_top, s1_right, s1_bottom, s1_cls, s1_kpts], 1);
+
+  // Scale 2: stride 32
+  const s2_bbox = builder.slice(in2, [0, 0, 0, 0], [1, 64, 20, 20]);
+  const s2_cls  = builder.slice(in2, [0, 64, 0, 0], [1,  1, 20, 20]);
+  const s2_kpts = builder.slice(in2, [0, 65, 0, 0], [1, 15, 20, 20]);
+  const s2_left   = builder.reduceSum(builder.mul(builder.softmax(builder.slice(s2_bbox, [0,  0, 0, 0], [1, 16, 20, 20]), 1), dflWeight), { axes: [1], keepDimensions: true });
+  const s2_top    = builder.reduceSum(builder.mul(builder.softmax(builder.slice(s2_bbox, [0, 16, 0, 0], [1, 16, 20, 20]), 1), dflWeight), { axes: [1], keepDimensions: true });
+  const s2_right  = builder.reduceSum(builder.mul(builder.softmax(builder.slice(s2_bbox, [0, 32, 0, 0], [1, 16, 20, 20]), 1), dflWeight), { axes: [1], keepDimensions: true });
+  const s2_bottom = builder.reduceSum(builder.mul(builder.softmax(builder.slice(s2_bbox, [0, 48, 0, 0], [1, 16, 20, 20]), 1), dflWeight), { axes: [1], keepDimensions: true });
+  const dfl18 = builder.concat([s2_left, s2_top, s2_right, s2_bottom, s2_cls, s2_kpts], 1);
+
+  const namedOutputs = { 'dfl0': dfl0, 'dfl17': dfl17, 'dfl18': dfl18 };
+  const outputShapes = {};
+  for (const [name, operand] of Object.entries(namedOutputs)) {
+    outputShapes[name] = Array.from(operand.shape);
+  }
+  return { graph: await builder.build(namedOutputs), outputShapes };
+}
+
+
+async function main(deviceType) {
+  deviceType = deviceType || 'cpu';
+  if (!navigator.ml) throw new Error('WebNN is not supported in this browser.');
+  var context = await navigator.ml.createContext({ deviceType: deviceType });
+  var weights = await WeightsFile.load('yolov8n-face.weights', 'yolov8n-face.manifest.json');
+
+  var buildStart = performance.now();
+  var yoloGraph = await buildGraph(context, weights);
+  var dflGraph = await buildDFLGraph(context);
+  console.log('Graph build: ' + (performance.now() - buildStart).toFixed(2) + 'ms on ' + deviceType.toUpperCase());
+
+  var inputData = new Uint8ClampedArray(640 * 640 * 4);
+  var inputTensor = await context.createTensor({ dataType: 'uint8', shape: [1,640,640,4], writable: true });
+  context.writeTensor(inputTensor, inputData);
+
+  var interm0 = await context.createTensor({ dataType: 'float32', shape: yoloGraph.outputShapes['output0'], readable: true, writable: true });
+  var interm17 = await context.createTensor({ dataType: 'float32', shape: yoloGraph.outputShapes['cat_17'], readable: true, writable: true });
+  var interm18 = await context.createTensor({ dataType: 'float32', shape: yoloGraph.outputShapes['cat_18'], readable: true, writable: true });
+
+  var dflOut0 = await context.createTensor({ dataType: 'float32', shape: dflGraph.outputShapes['dfl0'], readable: true });
+  var dflOut17 = await context.createTensor({ dataType: 'float32', shape: dflGraph.outputShapes['dfl17'], readable: true });
+  var dflOut18 = await context.createTensor({ dataType: 'float32', shape: dflGraph.outputShapes['dfl18'], readable: true });
+
+  var start = performance.now();
+  context.dispatch(yoloGraph.graph, { 'images': inputTensor }, { 'output0': interm0, 'cat_17': interm17, 'cat_18': interm18 });
+  context.dispatch(dflGraph.graph, { 'in0': interm0, 'in1': interm17, 'in2': interm18 }, { 'dfl0': dflOut0, 'dfl17': dflOut17, 'dfl18': dflOut18 });
+
+  var r0 = new Float32Array(await context.readTensor(dflOut0));
+  var r17 = new Float32Array(await context.readTensor(dflOut17));
+  var r18 = new Float32Array(await context.readTensor(dflOut18));
+  console.log('Inference: ' + (performance.now() - start).toFixed(2) + 'ms (1 run, YOLO+DFL) on ' + deviceType.toUpperCase());
+
+  var NUM_RUNS = 50;
+  var runTimes = [];
+  for (var i = 0; i < NUM_RUNS; i++) {
+    var t0 = performance.now();
+    context.dispatch(yoloGraph.graph, { 'images': inputTensor }, { 'output0': interm0, 'cat_17': interm17, 'cat_18': interm18 });
+    context.dispatch(dflGraph.graph, { 'in0': interm0, 'in1': interm17, 'in2': interm18 }, { 'dfl0': dflOut0, 'dfl17': dflOut17, 'dfl18': dflOut18 });
+    new Float32Array(await context.readTensor(dflOut0));
+    new Float32Array(await context.readTensor(dflOut17));
+    new Float32Array(await context.readTensor(dflOut18));
+    runTimes.push(performance.now() - t0);
+  }
+  var avgTime = (runTimes.reduce(function(a, b) { return a + b; }, 0) / NUM_RUNS).toFixed(2);
+  var sorted = runTimes.slice().sort(function(a, b) { return a - b; });
+  var medianTime = (NUM_RUNS % 2 ? sorted[NUM_RUNS >> 1] : (sorted[NUM_RUNS / 2 - 1] + sorted[NUM_RUNS / 2]) / 2).toFixed(2);
+  console.log('Inference: ' + avgTime + 'ms (average, ' + NUM_RUNS + ' runs) on ' + deviceType.toUpperCase());
+  console.log('Inference: ' + medianTime + 'ms (median, ' + NUM_RUNS + ' runs) on ' + deviceType.toUpperCase());
+
+  return { 'dfl0': r0, 'dfl17': r17, 'dfl18': r18 };
+}
+// ---- Harness ----
+const INPUT_INFO = [
+    { name: 'images', dataType: 'uint8', shape: [1,640,640,4], TypedArray: Uint8ClampedArray, size: 1638400 },
+];
+
+const OUTPUT_INFO = [
+    { name: 'dfl0', dataType: 'float32', shape: [1,20,80,80], TypedArray: Float32Array, size: 128000 },
+    { name: 'dfl17', dataType: 'float32', shape: [1,20,40,40], TypedArray: Float32Array, size: 32000 },
+    { name: 'dfl18', dataType: 'float32', shape: [1,20,20,20], TypedArray: Float32Array, size: 8000 },
+];
+
+async function run() {
+  var statusEl = document.getElementById('status');
+  var runBtn = document.getElementById('runBtn');
+  var resultsCard = document.getElementById('resultsCard');
+  var resultsEl = document.getElementById('results');
+  var deviceType = document.getElementById('device').value;
+
+  try {
+    runBtn.disabled = true;
+    statusEl.className = 'status info';
+    statusEl.textContent = 'Checking WebNN support...';
+
+    if (!navigator.ml) {
+      throw new Error('WebNN is not supported in this browser. Try Chrome 147+ with WebNN flags enabled.');
+    }
+
+    statusEl.textContent = 'Creating context (' + deviceType + ')...';
+    var context = await navigator.ml.createContext({ deviceType: deviceType });
+
+    statusEl.textContent = 'Loading weights...';
+    var weights = await WeightsFile.load('yolov8n-face.weights', 'yolov8n-face.manifest.json');
+
+    statusEl.textContent = 'Building graphs (YOLO + DFL)...';
+    var buildStart = performance.now();
+    var yoloGraph = await buildGraph(context, weights);
+    var dflGraph = await buildDFLGraph(context);
+    var buildElapsed = (performance.now() - buildStart).toFixed(2);
+    console.log('Graph build: ' + buildElapsed + 'ms on ' + deviceType.toUpperCase());
+
+    // Create YOLO input tensor
+    var inputs = {};
+    for (var ii = 0; ii < INPUT_INFO.length; ii++) {
+      var info = INPUT_INFO[ii];
+      var data = new info.TypedArray(info.size);
+      var isBigInt = info.dataType === 'int64' || info.dataType === 'uint64';
+      for (var j = 0; j < data.length; j++) data[j] = isBigInt ? BigInt(Math.floor(Math.random() * 100)) : Math.random() * 2 - 1;
+
+      var tensor = await context.createTensor({
+        dataType: info.dataType,
+        shape: info.shape,
+        writable: true
+      });
+      context.writeTensor(tensor, data);
+      inputs[info.name] = tensor;
+    }
+
+    // Create intermediate tensors (YOLO outputs = DFL inputs)
+    var intermTensors = {};
+    var yoloOutputNames = ['output0', 'cat_17', 'cat_18'];
+    for (var yi = 0; yi < yoloOutputNames.length; yi++) {
+      var yname = yoloOutputNames[yi];
+      intermTensors[yname] = await context.createTensor({
+        dataType: 'float32',
+        shape: yoloGraph.outputShapes[yname],
+        readable: true,
+        writable: true
+      });
+    }
+
+    // Create DFL output tensors
+    var outputs = {};
+    for (var oi = 0; oi < OUTPUT_INFO.length; oi++) {
+      var oinfo = OUTPUT_INFO[oi];
+      var otensor = await context.createTensor({
+        dataType: oinfo.dataType,
+        shape: oinfo.shape,
+        readable: true
+      });
+      outputs[oinfo.name] = otensor;
+    }
+
+    // Warm-up
+    var yoloOuts = {};
+    yoloOuts['output0'] = intermTensors['output0'];
+    yoloOuts['cat_17'] = intermTensors['cat_17'];
+    yoloOuts['cat_18'] = intermTensors['cat_18'];
+    context.dispatch(yoloGraph.graph, inputs, yoloOuts);
+    context.dispatch(dflGraph.graph, { 'in0': intermTensors['output0'], 'in1': intermTensors['cat_17'], 'in2': intermTensors['cat_18'] }, outputs);
+    for (var oi2 = 0; oi2 < OUTPUT_INFO.length; oi2++) {
+      new Float32Array(await context.readTensor(outputs[OUTPUT_INFO[oi2].name]));
+    }
+
+    // Benchmark
+    var NUM_RUNS = 50;
+    var runTimes = [];
+    for (var run = 0; run < NUM_RUNS; run++) {
+      var t0 = performance.now();
+      context.dispatch(yoloGraph.graph, inputs, yoloOuts);
+      context.dispatch(dflGraph.graph, { 'in0': intermTensors['output0'], 'in1': intermTensors['cat_17'], 'in2': intermTensors['cat_18'] }, outputs);
+      for (var oi3 = 0; oi3 < OUTPUT_INFO.length; oi3++) {
+        new Float32Array(await context.readTensor(outputs[OUTPUT_INFO[oi3].name]));
+      }
+      runTimes.push(performance.now() - t0);
+    }
+
+    // Compute stats
+    var avgTime = runTimes.reduce(function(a, b) { return a + b; }, 0) / NUM_RUNS;
+    var sorted = runTimes.slice().sort(function(a, b) { return a - b; });
+    var medianTime = NUM_RUNS % 2 ? sorted[NUM_RUNS >> 1] : (sorted[NUM_RUNS / 2 - 1] + sorted[NUM_RUNS / 2]) / 2;
+
+    resultsEl.innerHTML =
+      '<p><strong>Graph build:</strong> ' + buildElapsed + ' ms</p>' +
+      '<p><strong>Average inference over ' + NUM_RUNS + ' runs:</strong> ' + avgTime.toFixed(2) + ' ms (YOLO+DFL)</p>' +
+      '<p><strong>Median inference over ' + NUM_RUNS + ' runs:</strong> ' + medianTime.toFixed(2) + ' ms (YOLO+DFL)</p>' +
+      '<p><strong>DFL Outputs:</strong></p>' +
+      '<pre>' + JSON.stringify({
+        dfl0: dflGraph.outputShapes['dfl0'],
+        dfl17: dflGraph.outputShapes['dfl17'],
+        dfl18: dflGraph.outputShapes['dfl18']
+      }, null, 2) + '</pre>';
+
+    resultsCard.style.display = '';
+    statusEl.className = 'status success';
+    statusEl.textContent = 'Done. Average: ' + avgTime.toFixed(2) + 'ms / run (' + NUM_RUNS + ' runs)';
+
+  } catch (e) {
+    statusEl.className = 'status error';
+    statusEl.textContent = 'Error: ' + e.message;
+    console.error(e);
+  } finally {
+    runBtn.disabled = false;
+  }
+}
+  </script>
+</body>
+</html>
