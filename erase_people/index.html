@@ -159,8 +159,16 @@ function maskToImageData(mask, x1, y1, w, h){
 async function loadModel(backend, device){
   var resp=await fetch('yolov8n-seg.onnx');
   var buf=await resp.arrayBuffer();
-  var eps = backend==='webnn' ? [{name:'webnn', deviceType:device}] : ['wasm'];
-  return ort.InferenceSession.create(buf, {executionProviders: eps});
+  if(backend==='webnn'){
+    try{
+      return await ort.InferenceSession.create(buf, {executionProviders: [{name:'webnn', deviceType:device}]});
+    }catch(e){
+      console.warn('WebNN EP failed, falling back to WASM:', e.message);
+      sS('WebNN EP unsupported for this model — using WASM fallback...','info');
+      return await ort.InferenceSession.create(buf, {executionProviders: ['wasm']});
+    }
+  }
+  return await ort.InferenceSession.create(buf, {executionProviders: ['wasm']});
 }
 
 async function run(){
