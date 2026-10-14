@@ -45,7 +45,7 @@
 <body>
 <div class="container">
   <h1>Background Blur — CPU vs WebNN</h1>
-  <p class="subtitle">Same MediaPipe Selfie Segmentation model, two backends: WASM (CPU) vs pure WebNN (NPU/GPU). Gaussian background blur + person kept sharp.</p>
+  <p class="subtitle">Same MediaPipe Selfie Segmentation model, pure WebNN on two devices: CPU vs NPU/GPU. Gaussian background blur + person kept sharp.</p>
 
   <div class="card">
     <div class="controls">
@@ -81,12 +81,12 @@
   <div class="card">
     <div class="side-by-side">
       <div class="side">
-        <h3>Conventional — WASM / CPU <span class="tag tag-wasm">CPU</span></h3>
+        <h3>WebNN — CPU <span class="tag tag-wasm">CPU</span></h3>
         <canvas id="canvasWasm" width="480" height="360"></canvas>
         <div class="metrics" id="metricsWasm"></div>
       </div>
       <div class="side">
-        <h3>WebNN — navigator.ml <span class="tag tag-webnn" id="webnnTag">NPU</span></h3>
+        <h3>WebNN — Accelerator <span class="tag tag-webnn" id="webnnTag">NPU</span></h3>
         <canvas id="canvasWebnn" width="480" height="360"></canvas>
         <div class="metrics" id="metricsWebnn"></div>
       </div>
@@ -103,24 +103,23 @@
 <video id="sourceVideo" src="../virtual_tryon/514442_1_Person_20s_1920x1080.mp4" muted loop playsinline style="position:fixed;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;"></video>
 <video id="sourceCamera" autoplay muted playsinline style="position:fixed;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;"></video>
 
-<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.all.min.js"></script>
 <script src="selfie_seg_webnn.js"></script>
 <script>
 'use strict';
 var IMGSZ = 256;
-var _wasmSession = null;
+var _cpuModel = null;
 var _webnnModel = null;
 var _inputMode = 'image';
 var _running = false;
 var _rafId = null;
 var _frameW = 480, _frameH = 360;
 var _battery = null;         // BatteryManager if available
-var _jank = { wasm: 0, webnn: 0 };
+var _jank = { cpu: 0, accel: 0 };
 var _longtaskObserver = null;
 
 var _m = {
-  wasm: { frames: 0, totalMs: 0, times: [], fps: 0, lastT: 0 },
-  webnn: { frames: 0, totalMs: 0, times: [], fps: 0, lastT: 0 }
+  cpu: { frames: 0, totalMs: 0, times: [], fps: 0, lastT: 0 },
+  accel: { frames: 0, totalMs: 0, times: [], fps: 0, lastT: 0 }
 };
 
 function $(id){ return document.getElementById(id); }
@@ -147,21 +146,16 @@ function getMemoryMB() { return performance.memory ? (performance.memory.usedJSH
 function getBattery() { return _battery ? Math.round(_battery.level * 100) + '%' + (_battery.charging ? ' ⚡' : '') : 'n/a'; }
 
 // ---- model loading ----
-async function loadWasm() {
-  var resp = await fetch('model.onnx');
-  var buf = await resp.arrayBuffer();
-  return ort.InferenceSession.create(buf, { executionProviders: ['wasm'] });
-}
 async function loadWebnn(deviceType) {
   var m = new SelfieSegmentationWebNN();
   await m.load(deviceType);
   return m;
 }
 async function loadModels() {
-  sS('Loading models (WASM + WebNN)…', 'info');
   var dev = $('deviceSelect').value;
+  sS('Loading models (WebNN CPU + WebNN ' + dev.toUpperCase() + ')…', 'info');
   $('webnnTag').textContent = dev.toUpperCase();
-  if (!_wasmSession) _wasmSession = await loadWasm();
+  if (!_cpuModel) _cpuModel = await loadWebnn('cpu');
   if (!_webnnModel) _webnnModel = await loadWebnn(dev);
   sS('Models ready. Click Run.', 'success');
 }
@@ -219,25 +213,17 @@ async function prepareSource() {
   $('canvasWebnn').width = _frameW; $('canvasWebnn').height = _frameH;
 }
 
-// ---- preprocessing (two variants) ----
-function preprocess(frameCanvas, normalize) {
+// ---- preprocessing ----
+function preprocess(frameCanvas) {
   var c = document.createElement('canvas'); c.width = IMGSZ; c.height = IMGSZ;
   var ctx = c.getContext('2d');
   ctx.drawImage(frameCanvas, 0, 0, IMGSZ, IMGSZ);
   var d = ctx.getImageData(0, 0, IMGSZ, IMGSZ).data;
   var N = IMGSZ * IMGSZ, t = new Float32Array(3 * N);
-  if (normalize === 'webnn') {
-    for (var i = 0; i < N; i++) {
-      t[i] = (d[i*4] - 127.5) / 127.5;
-      t[N+i] = (d[i*4+1] - 127.5) / 127.5;
-      t[2*N+i] = (d[i*4+2] - 127.5) / 127.5;
-    }
-  } else {
-    for (var j = 0; j < N; j++) {
-      t[j] = d[j*4] / 255;
-      t[N+j] = d[j*4+1] / 255;
-      t[2*N+j] = d[j*4+2] / 255;
-    }
+  for (var i = 0; i < N; i++) {
+    t[i] = (d[i*4] - 127.5) / 127.5;
+    t[N+i] = (d[i*4+1] - 127.5) / 127.5;
+    t[2*N+i] = (d[i*4+2] - 127.5) / 127.5;
   }
   return t;
 }
@@ -275,15 +261,11 @@ function renderBlur(resultCanvas, frameCanvas, mask, blurRadius) {
 }
 
 // ---- inference ----
-async function inferWasm(frameCanvas) {
-  var t = preprocess(frameCanvas, 'wasm');
-  var feeds = { 'pixel_values': new ort.Tensor('float32', t, [1,3,IMGSZ,IMGSZ]) };
-  var out = await _wasmSession.run(feeds);
-  return out['alphas'].data;
+async function inferCpu(frameCanvas) {
+  return await _cpuModel.run(preprocess(frameCanvas));
 }
 async function inferWebnn(frameCanvas) {
-  var t = preprocess(frameCanvas, 'webnn');
-  return await _webnnModel.run(t);
+  return await _webnnModel.run(preprocess(frameCanvas));
 }
 
 function getFrameCanvas() {
@@ -327,8 +309,8 @@ function fmt(side) {
          '<div class="m-row"><span>Battery</span><b>' + getBattery() + '</b></div>';
 }
 function updateMetrics() {
-  $('metricsWasm').innerHTML = fmt('wasm');
-  $('metricsWebnn').innerHTML = fmt('webnn');
+  $('metricsWasm').innerHTML = fmt('cpu');
+  $('metricsWebnn').innerHTML = fmt('accel');
 }
 
 // ---- main loop ----
@@ -337,16 +319,16 @@ async function processOnce() {
   var blur = parseInt($('blurSlider').value, 10);
 
   var t0 = performance.now();
-  var maskW = await inferWasm(frame);
+  var maskW = await inferCpu(frame);
   var msW = performance.now() - t0;
   renderBlur($('canvasWasm'), frame, maskW, blur);
-  recordMetrics('wasm', msW);
+  recordMetrics('cpu', msW);
 
   var t1 = performance.now();
   var maskN = await inferWebnn(frame);
   var msN = performance.now() - t1;
   renderBlur($('canvasWebnn'), frame, maskN, blur);
-  recordMetrics('webnn', msN);
+  recordMetrics('accel', msN);
 
   updateMetrics();
 }
@@ -360,7 +342,7 @@ async function loop() {
 async function start() {
   try {
     $('runBtn').disabled = true;
-    if (!_wasmSession || !_webnnModel) await loadModels();
+    if (!_cpuModel || !_webnnModel) await loadModels();
     await prepareSource();
     if (_inputMode === 'image') {
       await processOnce();
@@ -396,7 +378,7 @@ async function runBenchSide(side, seconds) {
   var n = 0;
   while (performance.now() - start < seconds * 1000) {
     var t0 = performance.now();
-    if (side === 'wasm') { var maskW = await inferWasm(frame); renderBlur($('canvasWasm'), frame, maskW, blur); }
+    if (side === 'cpu') { var maskW = await inferCpu(frame); renderBlur($('canvasWasm'), frame, maskW, blur); }
     else { var maskN = await inferWebnn(frame); renderBlur($('canvasWebnn'), frame, maskN, blur); }
     var ms = performance.now() - t0;
     _m[side].frames++; _m[side].totalMs += ms; _m[side].times.push(ms);
@@ -410,13 +392,13 @@ async function benchmark() {
   $('benchBtn').disabled = true;
   sS('Benchmarking (each side isolated, 5s)…', 'info');
   try {
-    if (!_wasmSession || !_webnnModel) await loadModels();
+    if (!_cpuModel || !_webnnModel) await loadModels();
     await prepareSource();
-    var a = await runBenchSide('wasm', 5);
-    var b = await runBenchSide('webnn', 5);
+    var a = await runBenchSide('cpu', 5);
+    var b = await runBenchSide('accel', 5);
     $('benchCard').style.display = '';
     $('benchTable').innerHTML =
-      '<tr><th></th><th>WASM (CPU)</th><th>WebNN</th></tr>' +
+      '<tr><th></th><th>CPU (WebNN)</th><th>Accelerator (WebNN)</th></tr>' +
       '<tr><td>Frames / 5s</td><td>' + a.frames + '</td><td>' + b.frames + '</td></tr>' +
       '<tr><td>FPS</td><td>' + a.fps.toFixed(1) + '</td><td>' + b.fps.toFixed(1) + '</td></tr>' +
       '<tr><td>Avg ms/frame</td><td>' + a.avg.toFixed(2) + '</td><td>' + b.avg.toFixed(2) + '</td></tr>' +
@@ -457,7 +439,7 @@ window.addEventListener('load', function () {
     try {
       _longtaskObserver = new PerformanceObserver(function (list) {
         for (var e of list.getEntries()) {
-          if (_running) { _jank.wasm++; _jank.webnn++; } // approximate; both compete in live mode
+          if (_running) { _jank.cpu++; _jank.accel++; } // approximate; both compete in live mode
         }
       });
       _longtaskObserver.observe({ entryTypes: ['longtask'] });
