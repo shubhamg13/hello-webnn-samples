@@ -100,8 +100,8 @@
 </div>
 
 <img id="sourceImage" src="../assets/portrait.jpg" crossorigin="anonymous" style="display:none">
-<video id="sourceVideo" src="../virtual_tryon/514442_1_Person_20s_1920x1080.mp4" muted loop playsinline style="display:none"></video>
-<video id="sourceCamera" autoplay muted playsinline style="display:none"></video>
+<video id="sourceVideo" src="../virtual_tryon/514442_1_Person_20s_1920x1080.mp4" muted loop playsinline style="position:fixed;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;"></video>
+<video id="sourceCamera" autoplay muted playsinline style="position:fixed;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;"></video>
 
 <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.all.min.js"></script>
 <script src="selfie_seg_webnn.js"></script>
@@ -173,16 +173,44 @@ function getSourceElement() {
   return $('sourceImage');
 }
 async function getCameraStream() {
-  var s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
-  $('sourceCamera').srcObject = s;
-  await new Promise(function (r) { $('sourceCamera').onloadedmetadata = r; });
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    throw new Error('Camera not supported here — getUserMedia requires a secure context (HTTPS or localhost) and a supporting browser (Chromium).');
+  }
+  var cam = $('sourceCamera');
+  if (cam.srcObject) return;
+  var stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+  } catch (e) {
+    throw new Error('Camera access denied or unavailable: ' + e.message);
+  }
+  cam.srcObject = stream;
+  // Wait until the video actually has frames + dimensions (with a timeout fallback).
+  await new Promise(function (resolve) {
+    if (cam.readyState >= 1 && cam.videoWidth > 0) return resolve();
+    var done = false;
+    function fin() {
+      if (done) return;
+      done = true;
+      cam.removeEventListener('loadedmetadata', fin);
+      cam.removeEventListener('loadeddata', fin);
+      cam.removeEventListener('canplay', fin);
+      resolve();
+    }
+    cam.addEventListener('loadedmetadata', fin);
+    cam.addEventListener('loadeddata', fin);
+    cam.addEventListener('canplay', fin);
+    setTimeout(fin, 5000);
+  });
+  try { await cam.play(); } catch (e) {}
 }
 async function prepareSource() {
   var el = getSourceElement();
   if (_inputMode === 'camera') await getCameraStream();
   if (_inputMode === 'video') await el.play().catch(function(){});
-  var vw = el.videoWidth || el.naturalWidth || 640;
-  var vh = el.videoHeight || el.naturalHeight || 480;
+  var vw = el.videoWidth || el.naturalWidth || 0;
+  var vh = el.videoHeight || el.naturalHeight || 0;
+  if (!vw || !vh) throw new Error('No video frames available — grant camera permission (and reload), or the video file failed to load.');
   // cap display at 480 wide
   var scale = Math.min(1, 480 / vw);
   _frameW = Math.max(2, Math.round(vw * scale));
