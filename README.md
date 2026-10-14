@@ -50,6 +50,7 @@ CPU / GPU / NPU device selector where supported.
 | YOLOv8s Detection | YOLOv8s detection demo | [`yolov8s_detection/`](yolov8s_detection/) |
 | Virtual Try-On | Realtime virtual makeup / lip try-on | [`virtual_tryon/`](virtual_tryon/) |
 | Erase People | YOLOv8n/s-seg instance segmentation (pure WebNN) — keep center person, erase others | [`erase_people/`](erase_people/) |
+| Background Blur (CPU vs WebNN) | MediaPipe selfie segmentation on WASM (CPU) vs pure WebNN (NPU/GPU) — side-by-side resource comparison | [`background_blur_benchmark/`](background_blur_benchmark/) |
 
 ### TensorFlow.js / TFLite
 

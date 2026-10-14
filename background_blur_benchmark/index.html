@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Background Blur — CPU vs WebNN</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, sans-serif; background: #f5f5f5; color: #1a1a1a; padding: 1.5rem; }
+  .container { max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 1.4rem; margin-bottom: .25rem; }
+  .subtitle { color: #666; font-size: .85rem; margin-bottom: 1rem; }
+  .card { background: #fff; border-radius: 6px; padding: 1rem 1.25rem; margin-bottom: .75rem; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+  .controls { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
+  .control-label { font-weight: 600; font-size: .85rem; }
+  .segmented { display: inline-flex; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; }
+  .seg-btn { background: #fff; color: #1a1a1a; border: none; border-radius: 0; padding: .45rem .9rem; font-size: .85rem; font-weight: 600; min-width: 4rem; cursor: pointer; }
+  .seg-btn + .seg-btn { border-left: 1px solid #ddd; }
+  .seg-btn:hover { background: #eef3ff; }
+  .seg-btn.active { background: rgba(0,47,167,1); color: #fff; }
+  button { padding: .45rem .9rem; border: 1px solid #ddd; border-radius: 4px; font-size: .85rem; cursor: pointer; background: rgba(0,47,167,1); color: #fff; border: none; font-weight: 500; }
+  button:disabled { background: #ccc; cursor: not-allowed; }
+  input[type=range] { vertical-align: middle; }
+  .status { padding: .6rem 1rem; font-size: .85rem; border-radius: 4px; margin-bottom: .75rem; }
+  .status.info { background: #e3f2fd; border-left: 3px solid #2196F3; }
+  .status.success { background: #e9f8f0; border-left: 3px solid #068906; }
+  .status.error { background: #ffebee; border-left: 3px solid #f44336; }
+
+  .side-by-side { display: flex; gap: 1rem; flex-wrap: wrap; }
+  .side { flex: 1; min-width: 320px; }
+  .side h3 { font-size: .95rem; margin-bottom: .4rem; }
+  .side .tag { font-size: .7rem; padding: 1px 6px; border-radius: 3px; color: #fff; vertical-align: middle; }
+  .tag-wasm { background: #ff6f00; }
+  .tag-webnn { background: #0052cc; }
+  canvas { width: 100%; height: auto; display: block; background: #000; border-radius: 4px; }
+  .metrics { font-size: .8rem; color: #333; margin-top: .4rem; line-height: 1.5; }
+  .metrics b { color: rgba(0,47,167,1); }
+  .metrics .m-row { display: flex; justify-content: space-between; max-width: 320px; }
+  table { width: 100%; border-collapse: collapse; margin-top: .5rem; font-size: .8rem; }
+  th, td { text-align: left; padding: .35rem .5rem; border-bottom: 1px solid #eee; }
+  th { color: #666; font-weight: 600; }
+  #benchCard { display: none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Background Blur — CPU vs WebNN</h1>
+  <p class="subtitle">Same MediaPipe Selfie Segmentation model, two backends: WASM (CPU) vs pure WebNN (NPU/GPU). Gaussian background blur + person kept sharp.</p>
+
+  <div class="card">
+    <div class="controls">
+      <span class="control-label">Input:</span>
+      <div class="segmented" id="inputGroup">
+        <button type="button" class="seg-btn" data-value="image">Image</button>
+        <button type="button" class="seg-btn" data-value="video">Video</button>
+        <button type="button" class="seg-btn" data-value="camera">Camera</button>
+      </div>
+      <input type="hidden" id="inputSelect" value="image">
+
+      <span class="control-label">WebNN device:</span>
+      <div class="segmented" id="deviceGroup">
+        <button type="button" class="seg-btn" data-value="cpu">CPU</button>
+        <button type="button" class="seg-btn" data-value="gpu">GPU</button>
+        <button type="button" class="seg-btn" data-value="npu">NPU</button>
+      </div>
+      <input type="hidden" id="deviceSelect" value="npu">
+
+      <span class="control-label">Blur:</span>
+      <input type="range" id="blurSlider" min="2" max="32" value="14">
+      <span id="blurVal" style="font-size:.8rem;">14px</span>
+
+      <input type="file" id="imageInput" accept="image/*" style="display:none">
+      <button id="uploadBtn" onclick="document.getElementById('imageInput').click()">Choose Image</button>
+      <button id="runBtn" onclick="start()">Run</button>
+      <button id="benchBtn" onclick="benchmark()">Benchmark 5s</button>
+    </div>
+  </div>
+
+  <div id="status" class="status info">Loading models…</div>
+
+  <div class="card">
+    <div class="side-by-side">
+      <div class="side">
+        <h3>Conventional — WASM / CPU <span class="tag tag-wasm">CPU</span></h3>
+        <canvas id="canvasWasm" width="480" height="360"></canvas>
+        <div class="metrics" id="metricsWasm"></div>
+      </div>
+      <div class="side">
+        <h3>WebNN — navigator.ml <span class="tag tag-webnn" id="webnnTag">NPU</span></h3>
+        <canvas id="canvasWebnn" width="480" height="360"></canvas>
+        <div class="metrics" id="metricsWebnn"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="benchCard">
+    <h3>Isolated Benchmark</h3>
+    <table id="benchTable"></table>
+  </div>
+</div>
+
+<img id="sourceImage" src="../assets/portrait.jpg" crossorigin="anonymous" style="display:none">
+<video id="sourceVideo" src="../virtual_tryon/514442_1_Person_20s_1920x1080.mp4" muted loop playsinline style="display:none"></video>
+<video id="sourceCamera" autoplay muted playsinline style="display:none"></video>
+
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.all.min.js"></script>
+<script src="selfie_seg_webnn.js"></script>
+<script>
+'use strict';
+var IMGSZ = 256;
+var _wasmSession = null;
+var _webnnModel = null;
+var _inputMode = 'image';
+var _running = false;
+var _rafId = null;
+var _frameW = 480, _frameH = 360;
+var _battery = null;         // BatteryManager if available
+var _jank = { wasm: 0, webnn: 0 };
+var _longtaskObserver = null;
+
+var _m = {
+  wasm: { frames: 0, totalMs: 0, times: [], fps: 0, lastT: 0 },
+  webnn: { frames: 0, totalMs: 0, times: [], fps: 0, lastT: 0 }
+};
+
+function $(id){ return document.getElementById(id); }
+function sS(m, c){ var e = $('status'); e.textContent = m; e.className = 'status ' + (c || 'info'); }
+
+function initSegmented(groupId, inputId, cb) {
+  var group = $(groupId), input = $(inputId);
+  if (!group || !input) return;
+  function select(v) {
+    input.value = v;
+    for (var b of group.querySelectorAll('.seg-btn')) b.classList.toggle('active', b.dataset.value === v);
+    if (cb) cb(v);
+  }
+  group.addEventListener('click', function (ev) {
+    var b = ev.target.closest('.seg-btn');
+    if (b) select(b.dataset.value);
+  });
+  select(input.value);
+}
+
+// ---- feature detection helpers ----
+function hasGetUserMedia() { return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia); }
+function getMemoryMB() { return performance.memory ? (performance.memory.usedJSHeapSize / 1048576).toFixed(1) : 'n/a'; }
+function getBattery() { return _battery ? Math.round(_battery.level * 100) + '%' + (_battery.charging ? ' ⚡' : '') : 'n/a'; }
+
+// ---- model loading ----
+async function loadWasm() {
+  var resp = await fetch('model.onnx');
+  var buf = await resp.arrayBuffer();
+  return ort.InferenceSession.create(buf, { executionProviders: ['wasm'] });
+}
+async function loadWebnn(deviceType) {
+  var m = new SelfieSegmentationWebNN();
+  await m.load(deviceType);
+  return m;
+}
+async function loadModels() {
+  sS('Loading models (WASM + WebNN)…', 'info');
+  var dev = $('deviceSelect').value;
+  $('webnnTag').textContent = dev.toUpperCase();
+  if (!_wasmSession) _wasmSession = await loadWasm();
+  if (!_webnnModel) _webnnModel = await loadWebnn(dev);
+  sS('Models ready. Click Run.', 'success');
+}
+
+// ---- input source ----
+function getSourceElement() {
+  if (_inputMode === 'video') return $('sourceVideo');
+  if (_inputMode === 'camera') return $('sourceCamera');
+  return $('sourceImage');
+}
+async function getCameraStream() {
+  var s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false });
+  $('sourceCamera').srcObject = s;
+  await new Promise(function (r) { $('sourceCamera').onloadedmetadata = r; });
+}
+async function prepareSource() {
+  var el = getSourceElement();
+  if (_inputMode === 'camera') await getCameraStream();
+  if (_inputMode === 'video') await el.play().catch(function(){});
+  var vw = el.videoWidth || el.naturalWidth || 640;
+  var vh = el.videoHeight || el.naturalHeight || 480;
+  // cap display at 480 wide
+  var scale = Math.min(1, 480 / vw);
+  _frameW = Math.max(2, Math.round(vw * scale));
+  _frameH = Math.max(2, Math.round(vh * scale));
+  $('canvasWasm').width = _frameW; $('canvasWasm').height = _frameH;
+  $('canvasWebnn').width = _frameW; $('canvasWebnn').height = _frameH;
+}
+
+// ---- preprocessing (two variants) ----
+function preprocess(frameCanvas, normalize) {
+  var c = document.createElement('canvas'); c.width = IMGSZ; c.height = IMGSZ;
+  var ctx = c.getContext('2d');
+  ctx.drawImage(frameCanvas, 0, 0, IMGSZ, IMGSZ);
+  var d = ctx.getImageData(0, 0, IMGSZ, IMGSZ).data;
+  var N = IMGSZ * IMGSZ, t = new Float32Array(3 * N);
+  if (normalize === 'webnn') {
+    for (var i = 0; i < N; i++) {
+      t[i] = (d[i*4] - 127.5) / 127.5;
+      t[N+i] = (d[i*4+1] - 127.5) / 127.5;
+      t[2*N+i] = (d[i*4+2] - 127.5) / 127.5;
+    }
+  } else {
+    for (var j = 0; j < N; j++) {
+      t[j] = d[j*4] / 255;
+      t[N+j] = d[j*4+1] / 255;
+      t[2*N+j] = d[j*4+2] / 255;
+    }
+  }
+  return t;
+}
+
+function maskToAlphaCanvas(mask, W, H) {
+  var c = document.createElement('canvas'); c.width = IMGSZ; c.height = IMGSZ;
+  var ctx = c.getContext('2d');
+  var img = ctx.createImageData(IMGSZ, IMGSZ);
+  for (var i = 0; i < IMGSZ*IMGSZ; i++) {
+    img.data[i*4] = 255; img.data[i*4+1] = 255; img.data[i*4+2] = 255;
+    img.data[i*4+3] = Math.round(Math.max(0, Math.min(1, mask[i])) * 255);
+  }
+  ctx.putImageData(img, 0, 0);
+  var out = document.createElement('canvas'); out.width = W; out.height = H;
+  out.getContext('2d').drawImage(c, 0, 0, W, H);
+  return out;
+}
+
+function renderBlur(resultCanvas, frameCanvas, mask, blurRadius) {
+  var W = resultCanvas.width, H = resultCanvas.height;
+  var rctx = resultCanvas.getContext('2d');
+  // blurred background
+  rctx.clearRect(0, 0, W, H);
+  rctx.filter = 'blur(' + blurRadius + 'px)';
+  rctx.drawImage(frameCanvas, 0, 0, W, H);
+  rctx.filter = 'none';
+  // sharp person (mask as alpha via destination-in)
+  var sharp = document.createElement('canvas'); sharp.width = W; sharp.height = H;
+  var sctx = sharp.getContext('2d');
+  sctx.drawImage(frameCanvas, 0, 0, W, H);
+  sctx.globalCompositeOperation = 'destination-in';
+  sctx.drawImage(maskToAlphaCanvas(mask, W, H), 0, 0, W, H);
+  sctx.globalCompositeOperation = 'source-over';
+  rctx.drawImage(sharp, 0, 0, W, H);
+}
+
+// ---- inference ----
+async function inferWasm(frameCanvas) {
+  var t = preprocess(frameCanvas, 'wasm');
+  var feeds = { 'pixel_values': new ort.Tensor('float32', t, [1,3,IMGSZ,IMGSZ]) };
+  var out = await _wasmSession.run(feeds);
+  return out['alphas'].data;
+}
+async function inferWebnn(frameCanvas) {
+  var t = preprocess(frameCanvas, 'webnn');
+  return await _webnnModel.run(t);
+}
+
+function getFrameCanvas() {
+  var el = getSourceElement();
+  var c = document.createElement('canvas'); c.width = _frameW; c.height = _frameH;
+  c.getContext('2d').drawImage(el, 0, 0, _frameW, _frameH);
+  return c;
+}
+
+// ---- metrics ----
+function recordMetrics(side, ms) {
+  var m = _m[side];
+  m.frames++;
+  m.totalMs += ms;
+  m.times.push(ms);
+  if (m.times.length > 60) m.times.shift();
+  var now = performance.now();
+  if (m.lastT && (now - m.lastT) >= 1000) {
+    m.fps = Math.round(m.frames / ((now - m.lastT) / 1000));
+    m.frames = 0;
+    m.lastT = now;
+  } else if (!m.lastT) {
+    m.lastT = now;
+  }
+}
+function avg(arr) { return arr.length ? (arr.reduce(function(a,b){return a+b;},0)/arr.length) : 0; }
+function median(arr) {
+  if (!arr.length) return 0;
+  var s = arr.slice().sort(function(a,b){return a-b;});
+  var mid = Math.floor(s.length/2);
+  return s.length % 2 ? s[mid] : (s[mid-1]+s[mid])/2;
+}
+function fmt(side) {
+  var m = _m[side];
+  var a = avg(m.times), md = median(m.times);
+  return '<div class="m-row"><span>FPS</span><b>' + (m.fps || '—') + '</b></div>' +
+         '<div class="m-row"><span>Inference (avg)</span><b>' + a.toFixed(2) + ' ms</b></div>' +
+         '<div class="m-row"><span>Inference (median)</span><b>' + md.toFixed(2) + ' ms</b></div>' +
+         '<div class="m-row"><span>Main-thread long tasks</span><b>' + _jank[side] + '</b></div>' +
+         '<div class="m-row"><span>JS heap</span><b>' + getMemoryMB() + ' MB</b></div>' +
+         '<div class="m-row"><span>Battery</span><b>' + getBattery() + '</b></div>';
+}
+function updateMetrics() {
+  $('metricsWasm').innerHTML = fmt('wasm');
+  $('metricsWebnn').innerHTML = fmt('webnn');
+}
+
+// ---- main loop ----
+async function processOnce() {
+  var frame = getFrameCanvas();
+  var blur = parseInt($('blurSlider').value, 10);
+
+  var t0 = performance.now();
+  var maskW = await inferWasm(frame);
+  var msW = performance.now() - t0;
+  renderBlur($('canvasWasm'), frame, maskW, blur);
+  recordMetrics('wasm', msW);
+
+  var t1 = performance.now();
+  var maskN = await inferWebnn(frame);
+  var msN = performance.now() - t1;
+  renderBlur($('canvasWebnn'), frame, maskN, blur);
+  recordMetrics('webnn', msN);
+
+  updateMetrics();
+}
+
+async function loop() {
+  if (!_running) return;
+  try { await processOnce(); } catch (e) { console.error(e); }
+  _rafId = requestAnimationFrame(loop);
+}
+
+async function start() {
+  try {
+    $('runBtn').disabled = true;
+    if (!_wasmSession || !_webnnModel) await loadModels();
+    await prepareSource();
+    if (_inputMode === 'image') {
+      await processOnce();
+      sS('Done (single frame). Switch to Video/Camera for live FPS.', 'success');
+    } else {
+      _running = true;
+      loop();
+      sS('Running live…', 'info');
+    }
+  } catch (e) {
+    sS('Error: ' + e.message, 'error');
+    console.error(e);
+  } finally {
+    $('runBtn').disabled = false;
+  }
+}
+
+function stop() {
+  _running = false;
+  if (_rafId) cancelAnimationFrame(_rafId);
+  var cam = $('sourceCamera');
+  if (cam.srcObject) { cam.srcObject.getTracks().forEach(function(t){t.stop();}); cam.srcObject = null; }
+  var vid = $('sourceVideo'); vid.pause();
+}
+
+// ---- isolated benchmark ----
+async function runBenchSide(side, seconds) {
+  _m[side] = { frames: 0, totalMs: 0, times: [], fps: 0, lastT: 0 };
+  _jank[side] = 0;
+  var frame = getFrameCanvas();
+  var blur = parseInt($('blurSlider').value, 10);
+  var start = performance.now();
+  var n = 0;
+  while (performance.now() - start < seconds * 1000) {
+    var t0 = performance.now();
+    if (side === 'wasm') { var maskW = await inferWasm(frame); renderBlur($('canvasWasm'), frame, maskW, blur); }
+    else { var maskN = await inferWebnn(frame); renderBlur($('canvasWebnn'), frame, maskN, blur); }
+    var ms = performance.now() - t0;
+    _m[side].frames++; _m[side].totalMs += ms; _m[side].times.push(ms);
+    n++;
+  }
+  var elapsed = (performance.now() - start) / 1000;
+  return { side: side, frames: n, elapsed: elapsed, fps: n / elapsed, avg: avg(_m[side].times), median: median(_m[side].times) };
+}
+
+async function benchmark() {
+  $('benchBtn').disabled = true;
+  sS('Benchmarking (each side isolated, 5s)…', 'info');
+  try {
+    if (!_wasmSession || !_webnnModel) await loadModels();
+    await prepareSource();
+    var a = await runBenchSide('wasm', 5);
+    var b = await runBenchSide('webnn', 5);
+    $('benchCard').style.display = '';
+    $('benchTable').innerHTML =
+      '<tr><th></th><th>WASM (CPU)</th><th>WebNN</th></tr>' +
+      '<tr><td>Frames / 5s</td><td>' + a.frames + '</td><td>' + b.frames + '</td></tr>' +
+      '<tr><td>FPS</td><td>' + a.fps.toFixed(1) + '</td><td>' + b.fps.toFixed(1) + '</td></tr>' +
+      '<tr><td>Avg ms/frame</td><td>' + a.avg.toFixed(2) + '</td><td>' + b.avg.toFixed(2) + '</td></tr>' +
+      '<tr><td>Median ms/frame</td><td>' + a.median.toFixed(2) + '</td><td>' + b.median.toFixed(2) + '</td></tr>';
+    sS('Benchmark complete.', 'success');
+  } catch (e) {
+    sS('Benchmark error: ' + e.message, 'error');
+    console.error(e);
+  } finally {
+    $('benchBtn').disabled = false;
+  }
+}
+
+// ---- init ----
+window.addEventListener('load', function () {
+  // hide camera button if unsupported
+  if (!hasGetUserMedia()) {
+    var camBtn = document.querySelector('#inputGroup .seg-btn[data-value="camera"]');
+    if (camBtn) camBtn.style.display = 'none';
+  }
+  initSegmented('inputGroup', 'inputSelect', function (v) {
+    stop();
+    _inputMode = v;
+    $('runBtn').textContent = v === 'image' ? 'Run' : 'Start';
+  });
+  initSegmented('deviceGroup', 'deviceSelect', function (v) {
+    _webnnModel = null; // rebuild on next run
+    $('webnnTag').textContent = v.toUpperCase();
+  });
+  $('blurSlider').addEventListener('input', function () { $('blurVal').textContent = this.value + 'px'; });
+  $('imageInput').addEventListener('change', function (e) {
+    var f = e.target.files[0]; if (!f) return;
+    $('sourceImage').src = URL.createObjectURL(f);
+    sS('Image loaded. Click Run.', 'info');
+  });
+  // long-task jank observer (Chromium)
+  if (typeof PerformanceObserver !== 'undefined') {
+    try {
+      _longtaskObserver = new PerformanceObserver(function (list) {
+        for (var e of list.getEntries()) {
+          if (_running) { _jank.wasm++; _jank.webnn++; } // approximate; both compete in live mode
+        }
+      });
+      _longtaskObserver.observe({ entryTypes: ['longtask'] });
+    } catch (e) {}
+  }
+  // battery (Chromium, deprecated)
+  if (navigator.getBattery) {
+    navigator.getBattery().then(function (b) { _battery = b; });
+  }
+  loadModels();
+});
+</script>
+</body>
+</html>
