@@ -1064,7 +1064,7 @@
 
         if (isYolo) {
           const prep = YOLODetector.preprocess(imageEl);
-          pixels = prep.pixels;  // Uint8ClampedArray, RGBA raw
+          pixels = prep.pixels;  // Float32Array, RGB NCHW normalized
           originalSize = prep.origShape;
           letterboxCanvas = prep.letterboxCanvas;
           dw = prep.dw;
@@ -1084,8 +1084,8 @@
 
         // ---- create input tensor ----
         statusEl.textContent = 'Running WebNN inference...';
-        const inputShape = isYolo ? [1, 640, 640, 4] : [1, 128, 128, 3];
-        const inputDataType = isYolo ? 'uint8' : 'float32';
+        const inputShape = isYolo ? [1, 3, 640, 640] : [1, 128, 128, 3];
+        const inputDataType = 'float32';
         const inputTensor = await context.createTensor({
           dataType: inputDataType, shape: inputShape, writable: true
         });

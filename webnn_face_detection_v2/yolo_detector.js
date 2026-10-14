@@ -51,11 +51,12 @@ const YOLODetector = (() => {
 
   /**
    * Letterbox-resize an image or canvas to 640×640 with gray padding.
-   * Returns raw RGBA uint8 pixels — the WebNN graph handles slice (RGBA→RGB),
-   * cast (uint8→float32), normalization (÷255), and NHWC→NCHW transpose.
+   * Returns RGB float32 pixels in NCHW layout, normalized ÷255 (alpha dropped).
+   * Preprocessing moved from the WebNN graph to JS because CoreML does not
+   * accept uint8 graph inputs.
    *
    * @param {HTMLImageElement|HTMLCanvasElement} imageElement
-   * @returns {{ pixels: Uint8ClampedArray, origShape: [number,number],
+   * @returns {{ pixels: Float32Array, origShape: [number,number],
    *             ratio: number, dw: number, dh: number, letterboxCanvas: HTMLCanvasElement }}
    */
   // Cached letterbox canvas - reused across frames
@@ -88,8 +89,15 @@ const YOLODetector = (() => {
     ctx.fillRect(0, 0, IMGSZ, IMGSZ);
     ctx.drawImage(imageElement, dw, dh, newW, newH);
     const imageData = ctx.getImageData(0, 0, IMGSZ, IMGSZ);
-    // Raw RGBA uint8 pixels
-    const pixels = imageData.data;  // Uint8ClampedArray, RGBA [0,255], NHWC layout
+    // Convert RGBA uint8 → RGB float32 NCHW, normalized ÷255 (alpha dropped).
+    const src = imageData.data;                 // Uint8ClampedArray, RGBA [0,255]
+    const plane = IMGSZ * IMGSZ;
+    const pixels = new Float32Array(3 * plane); // [R plane, G plane, B plane]
+    for (let i = 0, p = 0; i < plane; i++, p += 4) {
+      pixels[i]             = src[p]     / 255;  // R
+      pixels[plane + i]     = src[p + 1] / 255;  // G
+      pixels[2 * plane + i] = src[p + 2] / 255;  // B
+    }
 
     return {
       pixels,

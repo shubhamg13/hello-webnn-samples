@@ -6,19 +6,9 @@
 async function buildGraph(context, weights) {
   const builder = new MLGraphBuilder(context);
 
-  // Graph inputs — raw RGBA uint8, NHWC layout
-  const imagesRaw = builder.input('images', { dataType: 'uint8', shape: [1,640,640,4] });
-
-  // ---- Preprocessing (runs on GPU/NPU via WebNN) ----
-  // 1. Slice RGBA → RGB (drop alpha channel)
-  const imagesRGB = builder.slice(imagesRaw, [0, 0, 0, 0], [1, 640, 640, 3]);
-  // 2. Cast uint8 [0,255] → float32
-  const imagesFloat = builder.cast(imagesRGB, 'float32');
-  // 3. Normalize: divide by 255.0
-  const normConst = builder.constant({ dataType: 'float32', shape: [1] }, new Float32Array([255.0]));
-  const imagesNormalized = builder.div(imagesFloat, normConst);
-  // 4. Transpose NHWC [1,640,640,3] → NCHW [1,3,640,640]
-  const images = builder.transpose(imagesNormalized, { permutation: [0, 3, 1, 2] });
+  // Graph input — RGB float32, NCHW. Preprocessing (slice/cast/normalize/
+  // transpose) moved to JS because CoreML does not accept uint8 graph inputs.
+  const images = builder.input('images', { dataType: 'float32', shape: [1,3,640,640] });
 
   // Constants (loaded from weights file)
   const model_0_conv_weight = (() => {
