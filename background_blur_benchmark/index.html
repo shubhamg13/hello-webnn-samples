@@ -324,13 +324,41 @@ function maskToAlphaCanvas(mask, W, H) {
   return out;
 }
 
+var _blurSupported = null;
+function blurSupported() {
+  if (_blurSupported !== null) return _blurSupported;
+  try {
+    var c = document.createElement('canvas');
+    var ctx = c.getContext('2d');
+    if (!ctx || typeof ctx.filter === 'undefined') return (_blurSupported = false);
+    ctx.filter = 'blur(2px)';
+    _blurSupported = (ctx.filter === 'blur(2px)');
+  } catch (e) { _blurSupported = false; }
+  return _blurSupported;
+}
+
+// Draw the frame blurred. Uses ctx.filter when available (real Gaussian),
+// otherwise falls back to downscale + bilinear upscale (works everywhere incl. Servo).
+function drawBlurred(ctx, frameCanvas, W, H, radius) {
+  if (blurSupported()) {
+    ctx.filter = 'blur(' + radius + 'px)';
+    ctx.drawImage(frameCanvas, 0, 0, W, H);
+    ctx.filter = 'none';
+  } else {
+    var f = Math.max(2, Math.round(radius / 3));
+    var sw = Math.max(1, Math.round(W / f)), sh = Math.max(1, Math.round(H / f));
+    var small = document.createElement('canvas'); small.width = sw; small.height = sh;
+    small.getContext('2d').drawImage(frameCanvas, 0, 0, sw, sh);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(small, 0, 0, W, H);
+  }
+}
+
 function renderBlur(resultCanvas, frameCanvas, mask, blurRadius) {
   var W = resultCanvas.width, H = resultCanvas.height;
   var rctx = resultCanvas.getContext('2d');
   rctx.clearRect(0, 0, W, H);
-  rctx.filter = 'blur(' + blurRadius + 'px)';
-  rctx.drawImage(frameCanvas, 0, 0, W, H);
-  rctx.filter = 'none';
+  drawBlurred(rctx, frameCanvas, W, H, blurRadius);
   var sharp = document.createElement('canvas'); sharp.width = W; sharp.height = H;
   var sctx = sharp.getContext('2d');
   sctx.drawImage(frameCanvas, 0, 0, W, H);
