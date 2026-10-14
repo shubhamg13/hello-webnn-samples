@@ -34,6 +34,24 @@
     button:hover { background: rgba(0,47,167,0.85); }
     button:disabled { background: #ccc; cursor: not-allowed; }
 
+    /* Tap controls. Servo on OpenHarmony renders <select> but cannot operate
+       it, so device / model choice uses tappable buttons instead. Each group
+       writes its selection into a hidden input that keeps the original
+       element id, so the rest of the script reads `.value` unchanged. */
+    .control-label { font-weight: 600; font-size: 0.85rem; }
+    .segmented {
+      display: inline-flex; border: 1px solid #ddd; border-radius: 4px;
+      overflow: hidden;
+    }
+    .seg-btn {
+      background: #fff; color: #1a1a1a; border: none; border-radius: 0;
+      padding: 0.55rem 1.1rem; font-size: 0.85rem; font-weight: 600;
+      min-width: 4.5rem; cursor: pointer;
+    }
+    .seg-btn + .seg-btn { border-left: 1px solid #ddd; }
+    .seg-btn:hover { background: #eef3ff; }
+    .seg-btn.active { background: rgba(0,47,167,1); color: #fff; }
+
     .status {
       padding: 0.6rem 1rem; font-size: 0.85rem; border-radius: 4px;
       margin-bottom: 0.75rem;
@@ -83,26 +101,30 @@
 
     <div class="card">
       <div class="controls">
-        <label for="deviceSelect">Device:</label>
-        <select id="deviceSelect">
-          <option value="cpu">CPU</option>
-          <option value="gpu">GPU</option>
-          <option value="npu">NPU</option>
-        </select>
-        <label for="detectorModelSelect">Detector:</label>
-        <select id="detectorModelSelect" style="width:auto;padding:0.3rem 0.4rem;">
-          <option value="face_detector">Detector v1 (ONNX, 95 ops)</option>
-          <option value="mediapipe_face_detector">Detector v2 (TFLite, 164 ops)</option>
-          <option value="yolov8n_face">YOLOv8n-Face (640×640, 5 kpts)</option>
-        </select>
+        <span class="control-label">Device:</span>
+        <div class="segmented" id="deviceGroup" role="group" aria-label="Device">
+          <button type="button" class="seg-btn" data-value="cpu">CPU</button>
+          <button type="button" class="seg-btn" data-value="gpu">GPU</button>
+          <button type="button" class="seg-btn" data-value="npu">NPU</button>
+        </div>
+        <input type="hidden" id="deviceSelect" value="cpu">
+        <span class="control-label">Detector:</span>
+        <div class="segmented" id="detectorModelGroup" role="group" aria-label="Detector model">
+          <button type="button" class="seg-btn" data-value="face_detector">v1 (ONNX)</button>
+          <button type="button" class="seg-btn" data-value="mediapipe_face_detector">v2 (TFLite)</button>
+          <button type="button" class="seg-btn" data-value="yolov8n_face">YOLOv8n</button>
+        </div>
+        <input type="hidden" id="detectorModelSelect" value="face_detector">
         <input type="file" id="imageInput" accept="image/*" style="display:none">
         <button id="uploadBtn" onclick="document.getElementById('imageInput').click()">Choose Image</button>
         <label><input type="checkbox" id="dflGraphCheck" checked> DFL Graph</label>
         <label><input type="checkbox" id="landmarksCheck"> Face Landmarks</label>
-        <select id="landmarkModelSelect" style="width:auto;padding:0.3rem 0.4rem;">
-          <option value="face_landmark">LM v1 (192×192, 468 pts)</option>
-          <option value="face_landmarks_detector">LM v2 (256×256, 478 pts)</option>
-        </select>
+        <span class="control-label">LM:</span>
+        <div class="segmented" id="landmarkModelGroup" role="group" aria-label="Landmark model">
+          <button type="button" class="seg-btn" data-value="face_landmark">LM v1 (468)</button>
+          <button type="button" class="seg-btn" data-value="face_landmarks_detector">LM v2 (478)</button>
+        </div>
+        <input type="hidden" id="landmarkModelSelect" value="face_landmark">
         <button id="runBtn" onclick="runDetection()">Run Detection</button>
       </div>
     </div>
@@ -929,7 +951,9 @@
         for (const [start, end] of connections) {
           if (start >= landmarks.length || end >= landmarks.length) continue;
           const line = document.createElementNS(svgNS, 'line');
-          line.setAttribute('class', 'lm-line');
+          line.setAttribute('stroke', '#FFFF00');
+          line.setAttribute('stroke-width', '0.06');
+          line.setAttribute('opacity', '0.7');
           line.setAttribute('x1', (landmarks[start].x * 100).toFixed(4));
           line.setAttribute('y1', (landmarks[start].y * 100).toFixed(4));
           line.setAttribute('x2', (landmarks[end].x * 100).toFixed(4));
@@ -938,7 +962,7 @@
         }
         for (const lm of landmarks) {
           const circle = document.createElementNS(svgNS, 'circle');
-          circle.setAttribute('class', 'lm-dot');
+          circle.setAttribute('fill', '#00FFFF');
           circle.setAttribute('cx', (lm.x * 100).toFixed(4));
           circle.setAttribute('cy', (lm.y * 100).toFixed(4));
           circle.setAttribute('r', '0.18');
@@ -1075,7 +1099,9 @@
         let detections;
         let regressors, classificators;  // for SSD raw-output display
         let rawOutputs, rawShapes, yoloResult;  // for YOLO diagnostics
-        const inferStart = performance.now();
+        let inferStart = 0;
+        let inferTime = 0;
+        let dflBuildTime = 0;
         const useDFLGraph = document.getElementById('dflGraphCheck').checked;
         let dflOutNames;
         if (isYolo) {
@@ -1085,7 +1111,9 @@
           
           if (useDFLGraph) {
             // ---- WebNN DFL path ----
+            const dflBuildStart = performance.now();
             const dflGraphResult = await buildDFLGraph(context);
+            dflBuildTime = (performance.now() - dflBuildStart).toFixed(2);
             const yoloOutNames = detCfg.outputNames;
 
             // Intermediate tensors: YOLO outputs = DFL inputs (stay on device)
@@ -1109,7 +1137,7 @@
               });
               dflOutShapesLocal[name] = dflGraphResult.outputShapes[name];
             }
-
+            inferStart = performance.now();
             // Dispatch chain: YOLO -> DFL (no CPU readback between them)
             context.dispatch(graphResult.graph, { [detCfg.inputName]: inputTensor },
               { 'output0': intermTensors['output0'], 'cat_17': intermTensors['cat_17'], 'cat_18': intermTensors['cat_18'] });
@@ -1124,6 +1152,7 @@
               rawOutputs.push(new Float32Array(await context.readTensor(dflOutTensors[name])));
               rawShapes.push(dflOutShapesLocal[name]);
             }
+            inferTime = (performance.now() - inferStart).toFixed(2);
           } else {
             // ---- JS DFL path (no DFL graph, use dflSide in postprocess) ----
             dflOutNames = detCfg.outputNames;
@@ -1136,6 +1165,7 @@
               outShapesLocal[name] = graphResult.outputShapes[name];
             }
 
+            inferStart = performance.now();
             context.dispatch(graphResult.graph, { [detCfg.inputName]: inputTensor }, outTensors);
 
           // read outputs (assign to function-scoped vars for diagnostics)
@@ -1145,9 +1175,8 @@
               rawOutputs.push(new Float32Array(await context.readTensor(outTensors[name])));
               rawShapes.push(outShapesLocal[name]);
             }
+            inferTime = (performance.now() - inferStart).toFixed(2);
           }
-
-          const inferTime = (performance.now() - inferStart).toFixed(2);
 
           // ---- YOLO postprocessing ----
           statusEl.textContent = 'Post-processing (YOLO)...';
@@ -1172,6 +1201,7 @@
             dataType: 'float32', shape: graphResult.outputShapes[detCfg.classifierName], readable: true
           });
 
+          inferStart = performance.now();
           context.dispatch(graphResult.graph, { [detCfg.inputName]: inputTensor }, {
             [detCfg.regressorName]: outRegTensor,
             [detCfg.classifierName]: outClsTensor
@@ -1179,7 +1209,7 @@
 
           regressors = new Float32Array(await context.readTensor(outRegTensor));
           classificators = new Float32Array(await context.readTensor(outClsTensor));
-          const inferTime = (performance.now() - inferStart).toFixed(2);
+          inferTime = (performance.now() - inferStart).toFixed(2);
 
           // ---- SSD postprocessing ----
           statusEl.textContent = 'Post-processing (SSD)...';
@@ -1193,7 +1223,6 @@
           detections = SSDDetector.removeLetterboxPadding(detections, padding);
         }
 
-        const inferTime = (performance.now() - inferStart).toFixed(2);
         const [imgWidth, imgHeight] = originalSize;
 
         // ---- draw detections ----
@@ -1282,7 +1311,9 @@
 
         // ---- results display ----
         statusEl.className = 'status success';
-        let resultText = 'Build: ' + buildTime + 'ms | Inference: ' + inferTime + 'ms | Found ' + detections.length + ' face(s) on ' + deviceType.toUpperCase();
+        let resultText = 'YOLO build: ' + buildTime + 'ms'
+          + (isYolo && useDFLGraph ? ' | DFL build: ' + dflBuildTime + 'ms' : '')
+          + ' | Inference: ' + inferTime + 'ms | Found ' + detections.length + ' face(s) on ' + deviceType.toUpperCase();
         if (useLandmarks) {
           resultText += ' | LM build: ' + lmBuildTime + 'ms LM infer: ' + lmInferTime + 'ms';
           if (landmarksResults.length > 0) {
@@ -1296,8 +1327,11 @@
 
         html += '<div class="section-label">Timing</div>';
         html += '<table><tr><th>Phase</th><th>Time</th><th>Device</th></tr>';
-        html += '<tr><td>Face detector — graph build</td><td>' + buildTime + 'ms</td><td>' + deviceType.toUpperCase() + '</td></tr>';
-        html += '<tr><td>Face detector — inference</td><td>' + inferTime + 'ms</td><td>' + deviceType.toUpperCase() + '</td></tr>';
+        html += '<tr><td>Face detector — YOLO graph build</td><td>' + buildTime + 'ms</td><td>' + deviceType.toUpperCase() + '</td></tr>';
+        if (isYolo && useDFLGraph) {
+          html += '<tr><td>Face detector — DFL graph build</td><td>' + dflBuildTime + 'ms</td><td>' + deviceType.toUpperCase() + '</td></tr>';
+        }
+        html += '<tr><td>Face detector — inference (dispatch+read)</td><td>' + inferTime + 'ms</td><td>' + deviceType.toUpperCase() + '</td></tr>';
         if (useLandmarks) {
           html += '<tr><td>Face landmark — graph build</td><td>' + lmBuildTime + 'ms</td><td>' + deviceType.toUpperCase() + '</td></tr>';
           html += '<tr><td>Face landmark — inference (' + detections.length + ' face' + (detections.length !== 1 ? 's' : '') + ')</td><td>' + lmInferTime + 'ms</td><td>' + deviceType.toUpperCase() + '</td></tr>';
@@ -1437,7 +1471,34 @@
     // INIT
     // ==========================================================================
 
+    /// Wire a `.segmented` button group to the hidden input that carries the
+    /// original `<select>` id. Tapping a button sets the input's value and the
+    /// active style, so the rest of the script keeps reading `.value`.
+    function initSegmented(groupId, inputId) {
+      const group = document.getElementById(groupId);
+      const input = document.getElementById(inputId);
+      if (!group || !input) return;
+
+      const select = (value) => {
+        input.value = value;
+        for (const btn of group.querySelectorAll('.seg-btn')) {
+          btn.classList.toggle('active', btn.dataset.value === value);
+        }
+      };
+
+      group.addEventListener('click', (event) => {
+        const btn = event.target.closest('.seg-btn');
+        if (btn) select(btn.dataset.value);
+      });
+
+      select(input.value);
+    }
+
     window.addEventListener('load', () => {
+      initSegmented('deviceGroup', 'deviceSelect');
+      initSegmented('landmarkModelGroup', 'landmarkModelSelect');
+      initSegmented('detectorModelGroup', 'detectorModelSelect');
+
       const imageInput = document.getElementById('imageInput');
       const imageEl = document.getElementById('image');
       const overlayEl = document.getElementById('overlay');

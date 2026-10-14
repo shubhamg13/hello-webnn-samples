@@ -653,7 +653,10 @@ const YOLODetector = (() => {
 
       // bounding box
       const rect = document.createElementNS(svgNS, 'rect');
-      rect.setAttribute('class', 'det-rect');
+      rect.setAttribute('fill', 'none');
+      rect.setAttribute('stroke', '#00FF00');
+      rect.setAttribute('stroke-width', '0.3');
+      rect.setAttribute('vector-effect', 'non-scaling-stroke');
       rect.setAttribute('x', (xmin * 100).toFixed(4));
       rect.setAttribute('y', (ymin * 100).toFixed(4));
       rect.setAttribute('width', ((xmax - xmin) * 100).toFixed(4));
@@ -662,7 +665,10 @@ const YOLODetector = (() => {
 
       // score label
       const text = document.createElementNS(svgNS, 'text');
-      text.setAttribute('class', 'det-text');
+      text.setAttribute('fill', '#00FF00');
+      text.setAttribute('font-size', '1.6px');
+      text.setAttribute('font-weight', '600');
+      text.setAttribute('font-family', 'system-ui, sans-serif');
       text.setAttribute('x', (xmin * 100).toFixed(4));
       text.setAttribute('y', (ymin * 100 - 0.6).toFixed(4));
       text.textContent = (det.score * 100).toFixed(1) + '%';
@@ -673,11 +679,12 @@ const YOLODetector = (() => {
       for (let k = 0; k < numKeypoints; k++) {
         const kp = det.data[k + 2];
         const circle = document.createElementNS(svgNS, 'circle');
-        circle.setAttribute('class', 'keypoint');
+        circle.setAttribute('fill', KEYPOINT_COLORS[k]);
+        circle.setAttribute('stroke', '#fff');
+        circle.setAttribute('stroke-width', '0.08');
         circle.setAttribute('cx', (kp[0] * 100).toFixed(4));
         circle.setAttribute('cy', (kp[1] * 100).toFixed(4));
         circle.setAttribute('r', '0.5');
-        circle.style.fill = KEYPOINT_COLORS[k];
         overlayEl.appendChild(circle);
       }
     }
