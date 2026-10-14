@@ -105,7 +105,7 @@
 <video id="sourceVideo" src="../virtual_tryon/514442_1_Person_20s_1920x1080.mp4" muted loop playsinline style="position:fixed;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;"></video>
 <video id="sourceCamera" autoplay muted playsinline style="position:fixed;left:-9999px;width:1px;height:1px;opacity:0;pointer-events:none;"></video>
 
-<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.21.0/dist/ort.all.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.0/dist/ort.min.js"></script>
 <script src="selfie_seg_webnn.js"></script>
 <script>
 'use strict';
@@ -158,6 +158,9 @@ async function loadWebnn(deviceType) {
 }
 async function loadWasm() {
   if (typeof ort === 'undefined') throw new Error('ONNX Runtime failed to load (ort is undefined).');
+  // single-threaded WASM: no SharedArrayBuffer needed (works in Servo)
+  ort.env.wasm.numThreads = 1;
+  ort.env.wasm.wasmPaths = 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.16.0/dist/';
   var resp = await fetch('model.onnx');
   var buf = await resp.arrayBuffer();
   return ort.InferenceSession.create(buf, { executionProviders: ['wasm'] });
