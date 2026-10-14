@@ -82,6 +82,17 @@
       <input type="range" id="blurSlider" min="2" max="32" value="14">
       <span id="blurVal" style="font-size:.8rem;">14px</span>
 
+      <span class="control-label">Effect:</span>
+      <div class="segmented" id="effectGroup">
+        <button type="button" class="seg-btn" data-value="blur">Blur</button>
+        <button type="button" class="seg-btn" data-value="color">Color</button>
+        <button type="button" class="seg-btn" data-value="image">Image</button>
+      </div>
+      <input type="hidden" id="effectSelect" value="blur">
+      <input type="color" id="bgColor" value="#008080" title="Background color">
+      <input type="file" id="bgImageInput" accept="image/*" style="display:none">
+      <button id="bgImageBtn" onclick="document.getElementById('bgImageInput').click()" style="display:none;">BG Image</button>
+
       <input type="file" id="imageInput" accept="image/*" style="display:none">
       <button id="uploadBtn" onclick="document.getElementById('imageInput').click()">Choose Image</button>
       <button id="runBtn" onclick="start()">Run</button>
@@ -140,6 +151,7 @@ var _frameW = 480, _frameH = 360;
 var _battery = null;         // BatteryManager if available
 var _jank = { cpu: 0, accel: 0 };
 var _longtaskObserver = null;
+var _bgImage = null;         // background image for "image" effect
 
 // CPU-load worker (heuristic estimate)
 var _cpuWorker = null, _cpuBase = null, _cpuLoad = null, _cpuSamples = null, _collectCpu = false;
@@ -337,8 +349,55 @@ function blurSupported() {
   return _blurSupported;
 }
 
+// Separable box blur (moving average, O(1) per pixel). Multiple passes ≈ Gaussian.
+function boxBlur(data, width, height, radius) {
+  radius = Math.max(1, radius | 0);
+  var div = 2 * radius + 1, inv = 1 / div;
+  var tmp = new Uint8ClampedArray(data.length);
+  var x, y, j, r, g, b, a, xx, yy, il, ir, it, ib, row;
+  // horizontal pass: data -> tmp
+  for (y = 0; y < height; y++) {
+    row = y * width;
+    r = 0; g = 0; b = 0; a = 0;
+    for (x = -radius; x <= radius; x++) {
+      xx = x < 0 ? 0 : (x >= width ? width - 1 : x);
+      j = (row + xx) << 2;
+      r += data[j]; g += data[j + 1]; b += data[j + 2]; a += data[j + 3];
+    }
+    for (x = 0; x < width; x++) {
+      j = (row + x) << 2;
+      tmp[j] = r * inv; tmp[j + 1] = g * inv; tmp[j + 2] = b * inv; tmp[j + 3] = a * inv;
+      il = (row + (x - radius < 0 ? 0 : x - radius)) << 2;
+      ir = (row + (x + radius + 1 >= width ? width - 1 : x + radius + 1)) << 2;
+      r += data[ir] - data[il];
+      g += data[ir + 1] - data[il + 1];
+      b += data[ir + 2] - data[il + 2];
+      a += data[ir + 3] - data[il + 3];
+    }
+  }
+  // vertical pass: tmp -> data
+  for (x = 0; x < width; x++) {
+    r = 0; g = 0; b = 0; a = 0;
+    for (y = -radius; y <= radius; y++) {
+      yy = y < 0 ? 0 : (y >= height ? height - 1 : y);
+      j = (yy * width + x) << 2;
+      r += tmp[j]; g += tmp[j + 1]; b += tmp[j + 2]; a += tmp[j + 3];
+    }
+    for (y = 0; y < height; y++) {
+      j = (y * width + x) << 2;
+      data[j] = r * inv; data[j + 1] = g * inv; data[j + 2] = b * inv; data[j + 3] = a * inv;
+      it = ((y - radius < 0 ? 0 : y - radius) * width + x) << 2;
+      ib = ((y + radius + 1 >= height ? height - 1 : y + radius + 1) * width + x) << 2;
+      r += tmp[ib] - tmp[it];
+      g += tmp[ib + 1] - tmp[it + 1];
+      b += tmp[ib + 2] - tmp[it + 2];
+      a += tmp[ib + 3] - tmp[it + 3];
+    }
+  }
+}
+
 // Draw the frame blurred. Uses ctx.filter when available (real Gaussian),
-// otherwise falls back to downscale + bilinear upscale (works everywhere incl. Servo).
+// otherwise falls back to downscale + stack-blur (box-blur passes) + upscale.
 function drawBlurred(ctx, frameCanvas, W, H, radius) {
   if (blurSupported()) {
     ctx.filter = 'blur(' + radius + 'px)';
@@ -348,17 +407,42 @@ function drawBlurred(ctx, frameCanvas, W, H, radius) {
     var f = Math.max(2, Math.round(radius / 3));
     var sw = Math.max(1, Math.round(W / f)), sh = Math.max(1, Math.round(H / f));
     var small = document.createElement('canvas'); small.width = sw; small.height = sh;
-    small.getContext('2d').drawImage(frameCanvas, 0, 0, sw, sh);
+    var sctx = small.getContext('2d');
+    sctx.drawImage(frameCanvas, 0, 0, sw, sh);
+    var img = sctx.getImageData(0, 0, sw, sh);
+    var r = Math.max(1, Math.round(radius / f / 2));
+    for (var p = 0; p < 3; p++) boxBlur(img.data, sw, sh, r);
+    sctx.putImageData(img, 0, 0);
     ctx.imageSmoothingEnabled = true;
     ctx.drawImage(small, 0, 0, W, H);
   }
 }
 
-function renderBlur(resultCanvas, frameCanvas, mask, blurRadius) {
+// Draw the background for the chosen effect (person is composited separately).
+function drawBackground(ctx, frameCanvas, W, H, effect, radius, color, bgImage) {
+  if (effect === 'color') {
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, W, H);
+  } else if (effect === 'image') {
+    if (bgImage && (bgImage.naturalWidth || bgImage.width)) {
+      var iw = bgImage.naturalWidth || bgImage.width, ih = bgImage.naturalHeight || bgImage.height;
+      var s = Math.max(W / iw, H / ih);
+      var dw = iw * s, dh = ih * s;
+      ctx.drawImage(bgImage, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    } else {
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(0, 0, W, H);
+    }
+  } else {
+    drawBlurred(ctx, frameCanvas, W, H, radius);
+  }
+}
+
+function renderEffect(resultCanvas, frameCanvas, mask, effect, radius, color, bgImage) {
   var W = resultCanvas.width, H = resultCanvas.height;
   var rctx = resultCanvas.getContext('2d');
   rctx.clearRect(0, 0, W, H);
-  drawBlurred(rctx, frameCanvas, W, H, blurRadius);
+  drawBackground(rctx, frameCanvas, W, H, effect, radius, color, bgImage);
   var sharp = document.createElement('canvas'); sharp.width = W; sharp.height = H;
   var sctx = sharp.getContext('2d');
   sctx.drawImage(frameCanvas, 0, 0, W, H);
@@ -447,16 +531,25 @@ function updateMetrics() {
 }
 
 // ---- main loop ----
+function getEffectParams() {
+  return {
+    effect: $('effectSelect').value,
+    radius: parseInt($('blurSlider').value, 10),
+    color: $('bgColor').value,
+    bgImage: _bgImage
+  };
+}
+
 async function processOnce() {
   var frame = getFrameCanvas();
-  var blur = parseInt($('blurSlider').value, 10);
+  var ep = getEffectParams();
 
   var r = await inferCpu(frame);
-  renderBlur($('canvasWasm'), frame, r.mask, blur);
+  renderEffect($('canvasWasm'), frame, r.mask, ep.effect, ep.radius, ep.color, ep.bgImage);
   recordMetrics('cpu', r.totalMs, r.blockMs);
 
   r = await inferWebnn(frame);
-  renderBlur($('canvasWebnn'), frame, r.mask, blur);
+  renderEffect($('canvasWebnn'), frame, r.mask, ep.effect, ep.radius, ep.color, ep.bgImage);
   recordMetrics('accel', r.totalMs, r.blockMs);
 
   updateMetrics();
@@ -509,11 +602,11 @@ async function runBenchSide(side, seconds) {
   _cpuSamples = [];
   _collectCpu = true;
   var frame = getFrameCanvas();
-  var blur = parseInt($('blurSlider').value, 10);
+  var ep = getEffectParams();
   var start = performance.now();
   while (performance.now() - start < seconds * 1000) {
-    if (side === 'cpu') { var r = await inferCpu(frame); renderBlur($('canvasWasm'), frame, r.mask, blur); }
-    else { r = await inferWebnn(frame); renderBlur($('canvasWebnn'), frame, r.mask, blur); }
+    if (side === 'cpu') { var r = await inferCpu(frame); renderEffect($('canvasWasm'), frame, r.mask, ep.effect, ep.radius, ep.color, ep.bgImage); }
+    else { r = await inferWebnn(frame); renderEffect($('canvasWebnn'), frame, r.mask, ep.effect, ep.radius, ep.color, ep.bgImage); }
     recordMetrics(side, r.totalMs, r.blockMs);
   }
   _collectCpu = false;
@@ -622,10 +715,20 @@ window.addEventListener('load', function () {
     $('webnnTag').textContent = v.toUpperCase();
   });
   initSegmented('benchGroup', 'benchSelect');
+  initSegmented('effectGroup', 'effectSelect', function (v) {
+    $('bgImageBtn').style.display = v === 'image' ? 'inline-block' : 'none';
+  });
   $('blurSlider').addEventListener('input', function () { $('blurVal').textContent = this.value + 'px'; });
   $('useWasmCheck').addEventListener('change', function () {
     $('cpuTag').textContent = this.checked ? 'WASM' : 'WebNN';
     sS('CPU backend: ' + (this.checked ? 'WASM (ONNX Runtime)' : 'WebNN CPU') + '. Click Run.', 'info');
+  });
+  $('bgImageInput').addEventListener('change', function (e) {
+    var f = e.target.files[0]; if (!f) return;
+    var url = URL.createObjectURL(f);
+    var im = new Image();
+    im.onload = function () { _bgImage = im; sS('Background image loaded.', 'info'); };
+    im.src = url;
   });
   $('imageInput').addEventListener('change', function (e) {
     var f = e.target.files[0]; if (!f) return;
