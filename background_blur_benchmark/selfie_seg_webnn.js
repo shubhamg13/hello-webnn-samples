@@ -39,10 +39,13 @@ class SelfieSegmentationWebNN {
   }
 
   async run(inputNCHW) {
-    this._ctx.writeTensor(this._inT, inputNCHW);
-    this._ctx.dispatch(this._graph, { 'input': this._inT }, { 'segment_back': this._outT });
-    const buf = await this._ctx.readTensor(this._outT);
-    return new Float32Array(buf);
+    const t0 = performance.now();
+    this._ctx.writeTensor(this._inT, inputNCHW);                                   // sync (fast)
+    this._ctx.dispatch(this._graph, { 'input': this._inT }, { 'segment_back': this._outT }); // sync (submit)
+    const blockMs = performance.now() - t0;                                         // main-thread blocking (≈0)
+    const buf = await this._ctx.readTensor(this._outT);                             // async (NPU computes off-thread)
+    const totalMs = performance.now() - t0;
+    return { mask: new Float32Array(buf), blockMs: blockMs, totalMs: totalMs };
   }
 
   // conv2d helper with bias (weights keyed by conv index)

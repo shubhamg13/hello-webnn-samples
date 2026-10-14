@@ -18,7 +18,7 @@
   .seg-btn + .seg-btn { border-left: 1px solid #ddd; }
   .seg-btn:hover { background: #eef3ff; }
   .seg-btn.active { background: rgba(0,47,167,1); color: #fff; }
-  button { padding: .45rem .9rem; border: 1px solid #ddd; border-radius: 4px; font-size: .85rem; cursor: pointer; background: rgba(0,47,167,1); color: #fff; border: none; font-weight: 500; }
+  button { padding: .45rem .9rem; border-radius: 4px; font-size: .85rem; cursor: pointer; background: rgba(0,47,167,1); color: #fff; border: none; font-weight: 500; }
   button:disabled { background: #ccc; cursor: not-allowed; }
   input[type=range] { vertical-align: middle; }
   .status { padding: .6rem 1rem; font-size: .85rem; border-radius: 4px; margin-bottom: .75rem; }
@@ -35,11 +35,22 @@
   canvas { width: 100%; height: auto; display: block; background: #000; border-radius: 4px; }
   .metrics { font-size: .8rem; color: #333; margin-top: .4rem; line-height: 1.5; }
   .metrics b { color: rgba(0,47,167,1); }
-  .metrics .m-row { display: flex; justify-content: space-between; max-width: 320px; }
+  .metrics .m-row { display: flex; justify-content: space-between; max-width: 340px; }
+  .metrics .section { font-weight: 600; color: #888; margin-top: .3rem; font-size: .72rem; text-transform: uppercase; letter-spacing: .03em; }
+
   table { width: 100%; border-collapse: collapse; margin-top: .5rem; font-size: .8rem; }
   th, td { text-align: left; padding: .35rem .5rem; border-bottom: 1px solid #eee; }
   th { color: #666; font-weight: 600; }
   #benchCard { display: none; }
+
+  #verdict {
+    display: none; margin-top: .5rem; padding: .75rem 1rem; border-radius: 6px;
+    font-size: .9rem; font-weight: 600; line-height: 1.6;
+  }
+  #verdict.win-npu { background: #e9f8f0; border-left: 4px solid #068906; }
+  #verdict.win-cpu { background: #fff3e0; border-left: 4px solid #ff6f00; }
+  #verdict .big { font-size: 1.05rem; }
+  .delta-better { color: #068906; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -74,7 +85,15 @@
       <input type="file" id="imageInput" accept="image/*" style="display:none">
       <button id="uploadBtn" onclick="document.getElementById('imageInput').click()">Choose Image</button>
       <button id="runBtn" onclick="start()">Run</button>
-      <button id="benchBtn" onclick="benchmark()">Benchmark 5s</button>
+    </div>
+    <div class="controls" style="margin-top:.5rem;">
+      <span class="control-label">Benchmark:</span>
+      <div class="segmented" id="benchGroup">
+        <button type="button" class="seg-btn" data-value="10">Quick 10s</button>
+        <button type="button" class="seg-btn" data-value="30">Battery 30s</button>
+      </div>
+      <input type="hidden" id="benchSelect" value="10">
+      <button id="benchBtn" onclick="benchmark()">Run Benchmark</button>
     </div>
   </div>
 
@@ -97,6 +116,7 @@
 
   <div class="card" id="benchCard">
     <h3>Isolated Benchmark</h3>
+    <div id="verdict"></div>
     <table id="benchTable"></table>
   </div>
 </div>
@@ -121,10 +141,11 @@ var _battery = null;         // BatteryManager if available
 var _jank = { cpu: 0, accel: 0 };
 var _longtaskObserver = null;
 
-var _m = {
-  cpu: { frames: 0, totalMs: 0, times: [], fps: 0, lastT: 0 },
-  accel: { frames: 0, totalMs: 0, times: [], fps: 0, lastT: 0 }
-};
+// CPU-load worker (heuristic estimate)
+var _cpuWorker = null, _cpuBase = null, _cpuLoad = null, _cpuSamples = null, _collectCpu = false;
+
+function _newMetrics() { return { frames: 0, times: [], block: [], fps: 0, lastT: 0, firstFrame: null, cpu: [] }; }
+var _m = { cpu: _newMetrics(), accel: _newMetrics() };
 
 function $(id){ return document.getElementById(id); }
 function sS(m, c){ var e = $('status'); e.textContent = m; e.className = 'status ' + (c || 'info'); }
@@ -148,6 +169,37 @@ function initSegmented(groupId, inputId, cb) {
 function hasGetUserMedia() { return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia); }
 function getMemoryMB() { return performance.memory ? (performance.memory.usedJSHeapSize / 1048576).toFixed(1) : 'n/a'; }
 function getBattery() { return _battery ? Math.round(_battery.level * 100) + '%' + (_battery.charging ? ' ⚡' : '') : 'n/a'; }
+function batteryLevel() { return _battery ? _battery.level : null; }
+function hasBattery() { return !!_battery; }
+
+// ---- CPU load worker (estimate) ----
+function startCpuWorker() {
+  if (_cpuWorker || typeof Worker === 'undefined') return;
+  var code = [
+    'var WORK = 2000000, n = 0, t0 = Date.now();',
+    'setInterval(function(){',
+    '  var t = Date.now();',
+    '  postMessage({ n: n, dt: Math.max(1, t - t0) });',
+    '  n = 0; t0 = t;',
+    '}, 400);',
+    'function spin(){',
+    '  var x = 0;',
+    '  for (var i = 0; i < WORK; i++) x += (i & 1);',
+    '  n++;',
+    '  setTimeout(spin, 0);',
+    '}',
+    'spin();'
+  ].join('\n');
+  try {
+    _cpuWorker = new Worker(URL.createObjectURL(new Blob([code], { type: 'text/javascript' })));
+    _cpuWorker.onmessage = function (ev) {
+      var opsSec = ev.data.n * 1000 / ev.data.dt;
+      if (_cpuBase === null || opsSec > _cpuBase) _cpuBase = opsSec;
+      _cpuLoad = _cpuBase > 0 ? Math.max(0, Math.min(100, (1 - opsSec / _cpuBase) * 100)) : 0;
+      if (_collectCpu && _cpuSamples) _cpuSamples.push(_cpuLoad);
+    };
+  } catch (e) { _cpuWorker = null; }
+}
 
 // ---- model loading ----
 function useWasm() { return $('useWasmCheck').checked; }
@@ -203,7 +255,6 @@ async function getCameraStream() {
     throw new Error('Camera access denied or unavailable: ' + e.message);
   }
   cam.srcObject = stream;
-  // Wait until the video actually has frames + dimensions (with a timeout fallback).
   await new Promise(function (resolve) {
     if (cam.readyState >= 1 && cam.videoWidth > 0) return resolve();
     var done = false;
@@ -229,7 +280,6 @@ async function prepareSource() {
   var vw = el.videoWidth || el.naturalWidth || 0;
   var vh = el.videoHeight || el.naturalHeight || 0;
   if (!vw || !vh) throw new Error('No video frames available — grant camera permission (and reload), or the video file failed to load.');
-  // cap display at 480 wide
   var scale = Math.min(1, 480 / vw);
   _frameW = Math.max(2, Math.round(vw * scale));
   _frameH = Math.max(2, Math.round(vh * scale));
@@ -277,12 +327,10 @@ function maskToAlphaCanvas(mask, W, H) {
 function renderBlur(resultCanvas, frameCanvas, mask, blurRadius) {
   var W = resultCanvas.width, H = resultCanvas.height;
   var rctx = resultCanvas.getContext('2d');
-  // blurred background
   rctx.clearRect(0, 0, W, H);
   rctx.filter = 'blur(' + blurRadius + 'px)';
   rctx.drawImage(frameCanvas, 0, 0, W, H);
   rctx.filter = 'none';
-  // sharp person (mask as alpha via destination-in)
   var sharp = document.createElement('canvas'); sharp.width = W; sharp.height = H;
   var sctx = sharp.getContext('2d');
   sctx.drawImage(frameCanvas, 0, 0, W, H);
@@ -292,13 +340,15 @@ function renderBlur(resultCanvas, frameCanvas, mask, blurRadius) {
   rctx.drawImage(sharp, 0, 0, W, H);
 }
 
-// ---- inference ----
+// ---- inference (returns { mask, blockMs, totalMs }) ----
 async function inferCpu(frameCanvas) {
   if (useWasm()) {
     var t = preprocess(frameCanvas, 'wasm');
     var feeds = { 'pixel_values': new ort.Tensor('float32', t, [1,3,IMGSZ,IMGSZ]) };
-    var out = await _wasmSession.run(feeds);
-    return out['alphas'].data;
+    var t0 = performance.now();
+    var out = await _wasmSession.run(feeds);   // single-threaded: blocks main thread
+    var ms = performance.now() - t0;
+    return { mask: out['alphas'].data, blockMs: ms, totalMs: ms };
   }
   return await _cpuModel.run(preprocess(frameCanvas));
 }
@@ -314,12 +364,12 @@ function getFrameCanvas() {
 }
 
 // ---- metrics ----
-function recordMetrics(side, ms) {
+function recordMetrics(side, totalMs, blockMs) {
   var m = _m[side];
   m.frames++;
-  m.totalMs += ms;
-  m.times.push(ms);
-  if (m.times.length > 60) m.times.shift();
+  m.times.push(totalMs);
+  m.block.push(blockMs);
+  if (_cpuLoad !== null) m.cpu.push(_cpuLoad);
   var now = performance.now();
   if (m.lastT && (now - m.lastT) >= 1000) {
     m.fps = Math.round(m.frames / ((now - m.lastT) / 1000));
@@ -336,13 +386,30 @@ function median(arr) {
   var mid = Math.floor(s.length/2);
   return s.length % 2 ? s[mid] : (s[mid-1]+s[mid])/2;
 }
+function percentile(arr, p) {
+  if (!arr.length) return 0;
+  var s = arr.slice().sort(function(a,b){return a-b;});
+  var idx = (s.length - 1) * p;
+  var lo = Math.floor(idx), hi = Math.ceil(idx);
+  return lo === hi ? s[lo] : s[lo] + (s[hi] - s[lo]) * (idx - lo);
+}
 function fmt(side) {
   var m = _m[side];
-  var a = avg(m.times), md = median(m.times);
-  return '<div class="m-row"><span>FPS</span><b>' + (m.fps || '—') + '</b></div>' +
-         '<div class="m-row"><span>Inference (avg)</span><b>' + a.toFixed(2) + ' ms</b></div>' +
-         '<div class="m-row"><span>Inference (median)</span><b>' + md.toFixed(2) + ' ms</b></div>' +
-         '<div class="m-row"><span>Main-thread long tasks</span><b>' + _jank[side] + '</b></div>' +
+  var a = avg(m.times), md = median(m.times), p90 = percentile(m.times, 0.9), p99 = percentile(m.times, 0.99);
+  var blockAvg = avg(m.block);
+  var cpuAvg = avg(m.cpu);
+  var first = m.firstFrame === null ? '—' : m.firstFrame.toFixed(1) + ' ms';
+  var busyPct = m.times.length ? Math.min(100, (blockAvg / Math.max(1, a)) * 100) : 0;
+  return '<div class="section">Speed</div>' +
+         '<div class="m-row"><span>FPS</span><b>' + (m.fps || '—') + '</b></div>' +
+         '<div class="m-row"><span>Inference avg / median</span><b>' + a.toFixed(2) + ' / ' + md.toFixed(2) + ' ms</b></div>' +
+         '<div class="m-row"><span>Inference p90 / p99</span><b>' + p90.toFixed(2) + ' / ' + p99.toFixed(2) + ' ms</b></div>' +
+         '<div class="m-row"><span>First frame</span><b>' + first + '</b></div>' +
+         '<div class="section">CPU / energy</div>' +
+         '<div class="m-row"><span>Main-thread blocked / frame</span><b>' + blockAvg.toFixed(2) + ' ms</b></div>' +
+         '<div class="m-row"><span>Main-thread busy % of frame</span><b>' + busyPct.toFixed(0) + '%</b></div>' +
+         '<div class="m-row"><span>≈ CPU load (estimate)</span><b>' + (m.cpu.length ? cpuAvg.toFixed(0) + '%' : '—') + '</b></div>' +
+         '<div class="m-row"><span>Long tasks</span><b>' + _jank[side] + '</b></div>' +
          '<div class="m-row"><span>JS heap</span><b>' + getMemoryMB() + ' MB</b></div>' +
          '<div class="m-row"><span>Battery</span><b>' + getBattery() + '</b></div>';
 }
@@ -356,17 +423,13 @@ async function processOnce() {
   var frame = getFrameCanvas();
   var blur = parseInt($('blurSlider').value, 10);
 
-  var t0 = performance.now();
-  var maskW = await inferCpu(frame);
-  var msW = performance.now() - t0;
-  renderBlur($('canvasWasm'), frame, maskW, blur);
-  recordMetrics('cpu', msW);
+  var r = await inferCpu(frame);
+  renderBlur($('canvasWasm'), frame, r.mask, blur);
+  recordMetrics('cpu', r.totalMs, r.blockMs);
 
-  var t1 = performance.now();
-  var maskN = await inferWebnn(frame);
-  var msN = performance.now() - t1;
-  renderBlur($('canvasWebnn'), frame, maskN, blur);
-  recordMetrics('accel', msN);
+  r = await inferWebnn(frame);
+  renderBlur($('canvasWebnn'), frame, r.mask, blur);
+  recordMetrics('accel', r.totalMs, r.blockMs);
 
   updateMetrics();
 }
@@ -382,8 +445,13 @@ async function start() {
     $('runBtn').disabled = true;
     if (!modelsReady()) await loadModels();
     await prepareSource();
+    _m = { cpu: _newMetrics(), accel: _newMetrics() };
+    var tRun = performance.now();
     if (_inputMode === 'image') {
       await processOnce();
+      _m.cpu.firstFrame = performance.now() - tRun;
+      _m.accel.firstFrame = performance.now() - tRun;
+      updateMetrics();
       sS('Done (single frame). Switch to Video/Camera for live FPS.', 'success');
     } else {
       _running = true;
@@ -408,39 +476,76 @@ function stop() {
 
 // ---- isolated benchmark ----
 async function runBenchSide(side, seconds) {
-  _m[side] = { frames: 0, totalMs: 0, times: [], fps: 0, lastT: 0 };
+  _m[side] = _newMetrics();
   _jank[side] = 0;
+  _cpuSamples = [];
+  _collectCpu = true;
   var frame = getFrameCanvas();
   var blur = parseInt($('blurSlider').value, 10);
   var start = performance.now();
-  var n = 0;
   while (performance.now() - start < seconds * 1000) {
-    var t0 = performance.now();
-    if (side === 'cpu') { var maskW = await inferCpu(frame); renderBlur($('canvasWasm'), frame, maskW, blur); }
-    else { var maskN = await inferWebnn(frame); renderBlur($('canvasWebnn'), frame, maskN, blur); }
-    var ms = performance.now() - t0;
-    _m[side].frames++; _m[side].totalMs += ms; _m[side].times.push(ms);
-    n++;
+    if (side === 'cpu') { var r = await inferCpu(frame); renderBlur($('canvasWasm'), frame, r.mask, blur); }
+    else { r = await inferWebnn(frame); renderBlur($('canvasWebnn'), frame, r.mask, blur); }
+    recordMetrics(side, r.totalMs, r.blockMs);
   }
+  _collectCpu = false;
+  _cpuLoadsAvg[side] = avg(_cpuSamples);
   var elapsed = (performance.now() - start) / 1000;
-  return { side: side, frames: n, elapsed: elapsed, fps: n / elapsed, avg: avg(_m[side].times), median: median(_m[side].times) };
+  return {
+    frames: _m[side].times.length,
+    fps: _m[side].times.length / elapsed,
+    avg: avg(_m[side].times),
+    median: median(_m[side].times),
+    p90: percentile(_m[side].times, 0.9),
+    p99: percentile(_m[side].times, 0.99),
+    blockAvg: avg(_m[side].block),
+    cpu: avg(_cpuSamples)
+  };
 }
+
+var _cpuLoadsAvg = { cpu: null, accel: null };
 
 async function benchmark() {
   $('benchBtn').disabled = true;
-  sS('Benchmarking (each side isolated, 5s)…', 'info');
+  var seconds = parseInt($('benchSelect').value, 10);
+  var label = seconds >= 30 ? 'Battery' : 'Quick';
+  sS('Benchmarking (' + label + ', ' + seconds + 's per side, isolated)…', 'info');
   try {
     if (!modelsReady()) await loadModels();
     await prepareSource();
-    var a = await runBenchSide('cpu', 5);
-    var b = await runBenchSide('accel', 5);
+
+    var batStart = batteryLevel();
+    var a = await runBenchSide('cpu', seconds);
+    var batMid = batteryLevel();
+    var b = await runBenchSide('accel', seconds);
+    var batEnd = batteryLevel();
+
+    // battery drain (%/min) per side
+    var drainCpu = (batStart !== null && batMid !== null) ? (batStart - batMid) * 100 * 60 / seconds : null;
+    var drainAccel = (batMid !== null && batEnd !== null) ? (batMid - batEnd) * 100 * 60 / seconds : null;
+
+    var dev = $('deviceSelect').value.toUpperCase();
+    var cpuName = useWasm() ? 'WASM (CPU)' : 'WebNN CPU';
     $('benchCard').style.display = '';
-    $('benchTable').innerHTML =
-      '<tr><th></th><th>CPU (WebNN)</th><th>Accelerator (WebNN)</th></tr>' +
-      '<tr><td>Frames / 5s</td><td>' + a.frames + '</td><td>' + b.frames + '</td></tr>' +
-      '<tr><td>FPS</td><td>' + a.fps.toFixed(1) + '</td><td>' + b.fps.toFixed(1) + '</td></tr>' +
-      '<tr><td>Avg ms/frame</td><td>' + a.avg.toFixed(2) + '</td><td>' + b.avg.toFixed(2) + '</td></tr>' +
-      '<tr><td>Median ms/frame</td><td>' + a.median.toFixed(2) + '</td><td>' + b.median.toFixed(2) + '</td></tr>';
+
+    var rows = '';
+    rows += '<tr><th></th><th>' + cpuName + '</th><th>WebNN ' + dev + '</th></tr>';
+    rows += '<tr><td>Frames</td><td>' + a.frames + '</td><td>' + b.frames + '</td></tr>';
+    rows += '<tr><td>FPS</td><td>' + a.fps.toFixed(1) + '</td><td>' + b.fps.toFixed(1) + '</td></tr>';
+    rows += '<tr><td>Avg ms/frame</td><td>' + a.avg.toFixed(2) + '</td><td>' + b.avg.toFixed(2) + '</td></tr>';
+    rows += '<tr><td>Median ms/frame</td><td>' + a.median.toFixed(2) + '</td><td>' + b.median.toFixed(2) + '</td></tr>';
+    rows += '<tr><td>p90 / p99 (ms)</td><td>' + a.p90.toFixed(2) + ' / ' + a.p99.toFixed(2) + '</td><td>' + b.p90.toFixed(2) + ' / ' + b.p99.toFixed(2) + '</td></tr>';
+    rows += '<tr><td>Main-thread blocked / frame</td><td>' + a.blockAvg.toFixed(2) + ' ms</td><td>' + b.blockAvg.toFixed(2) + ' ms</td></tr>';
+    rows += '<tr><td>≈ CPU load</td><td>' + (a.cpu !== null ? a.cpu.toFixed(0) + '%' : '—') + '</td><td>' + (b.cpu !== null ? b.cpu.toFixed(0) + '%' : '—') + '</td></tr>';
+    if (drainCpu !== null && drainAccel !== null) {
+      rows += '<tr><td>Battery drain</td><td>' + drainCpu.toFixed(3) + ' %/min</td><td>' + drainAccel.toFixed(3) + ' %/min</td></tr>';
+      rows += '<tr><td>Energy / frame (drain ÷ frames)</td><td>' + (drainCpu / Math.max(1,a.frames)).toExponential(2) + '</td><td>' + (drainAccel / Math.max(1,b.frames)).toExponential(2) + '</td></tr>';
+    } else {
+      rows += '<tr><td>Battery drain</td><td colspan="2">n/a (no getBattery or charging)</td></tr>';
+    }
+    $('benchTable').innerHTML = rows;
+
+    renderVerdict(a, b, drainCpu, drainAccel, cpuName, dev);
     sS('Benchmark complete.', 'success');
   } catch (e) {
     sS('Benchmark error: ' + e.message, 'error');
@@ -450,9 +555,31 @@ async function benchmark() {
   }
 }
 
+function renderVerdict(a, b, drainCpu, drainAccel, cpuName, dev) {
+  var v = $('verdict');
+  var speedup = b.fps / Math.max(0.001, a.fps);
+  var cpuReduction = (a.blockAvg > 0) ? (1 - b.blockAvg / a.blockAvg) * 100 : 0;
+  var batteryReduction = (drainCpu !== null && drainCpu > 0) ? (1 - drainAccel / drainCpu) * 100 : null;
+
+  var winnerIsAccel = speedup >= 1;
+  v.style.display = '';
+  v.className = winnerIsAccel ? 'win-npu' : 'win-cpu';
+
+  var lines = [];
+  var winner = winnerIsAccel ? 'WebNN ' + dev : cpuName;
+  lines.push('<span class="big">' + winner + ' wins</span>');
+  lines.push(speedup >= 1
+    ? '— <b>' + speedup.toFixed(1) + '× faster</b> (FPS)'
+    : '— <b>' + (1/speedup).toFixed(1) + '× slower</b> (FPS)');
+  lines.push('— <b>' + Math.max(0, cpuReduction).toFixed(0) + '% less main-thread blocking</b>');
+  if (batteryReduction !== null && drainCpu !== null && drainCpu > 0) {
+    lines.push('— <b>' + Math.max(0, batteryReduction).toFixed(0) + '% less battery drain</b>');
+  }
+  v.innerHTML = lines.join('<br>');
+}
+
 // ---- init ----
 window.addEventListener('load', function () {
-  // hide camera button if unsupported
   if (!hasGetUserMedia()) {
     var camBtn = document.querySelector('#inputGroup .seg-btn[data-value="camera"]');
     if (camBtn) camBtn.style.display = 'none';
@@ -463,9 +590,10 @@ window.addEventListener('load', function () {
     $('runBtn').textContent = v === 'image' ? 'Run' : 'Start';
   });
   initSegmented('deviceGroup', 'deviceSelect', function (v) {
-    _webnnModel = null; // rebuild on next run
+    _webnnModel = null;
     $('webnnTag').textContent = v.toUpperCase();
   });
+  initSegmented('benchGroup', 'benchSelect');
   $('blurSlider').addEventListener('input', function () { $('blurVal').textContent = this.value + 'px'; });
   $('useWasmCheck').addEventListener('change', function () {
     $('cpuTag').textContent = this.checked ? 'WASM' : 'WebNN';
@@ -476,12 +604,12 @@ window.addEventListener('load', function () {
     $('sourceImage').src = URL.createObjectURL(f);
     sS('Image loaded. Click Run.', 'info');
   });
-  // long-task jank observer (Chromium)
-  if (typeof PerformanceObserver !== 'undefined') {
+  // long-task jank observer (guard against unsupported entry types)
+  if (typeof PerformanceObserver !== 'undefined' && PerformanceObserver.supportedEntryTypes && PerformanceObserver.supportedEntryTypes.indexOf('longtask') !== -1) {
     try {
       _longtaskObserver = new PerformanceObserver(function (list) {
         for (var e of list.getEntries()) {
-          if (_running) { _jank.cpu++; _jank.accel++; } // approximate; both compete in live mode
+          if (_running) { _jank.cpu++; _jank.accel++; }
         }
       });
       _longtaskObserver.observe({ entryTypes: ['longtask'] });
@@ -489,8 +617,9 @@ window.addEventListener('load', function () {
   }
   // battery (Chromium, deprecated)
   if (navigator.getBattery) {
-    navigator.getBattery().then(function (b) { _battery = b; });
+    navigator.getBattery().then(function (b) { _battery = b; }).catch(function(){});
   }
+  startCpuWorker();
   loadModels();
 });
 </script>
