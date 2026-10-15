@@ -84,12 +84,6 @@
       <button id="runBtn" onclick="start()">Run</button>
     </div>
     <div class="controls" style="margin-top:.5rem;">
-      <span class="control-label">Benchmark:</span>
-      <div class="segmented" id="benchGroup">
-        <button type="button" class="seg-btn" data-value="10">Quick 10s</button>
-        <button type="button" class="seg-btn" data-value="30">Battery 30s</button>
-      </div>
-      <input type="hidden" id="benchSelect" value="10">
       <button id="benchBtn" onclick="benchmark()">Run Benchmark</button>
     </div>
   </div>
@@ -635,9 +629,8 @@ async function runBenchSide(side, seconds) {
 
 async function benchmark() {
   $('benchBtn').disabled = true;
-  var seconds = parseInt($('benchSelect').value, 10);
-  var label = seconds >= 30 ? 'Battery' : 'Quick';
-  sS('Benchmarking (' + label + ', ' + seconds + 's per side, isolated)…', 'info');
+  var seconds = 10;
+  sS('Benchmarking (' + seconds + 's per side, isolated)…', 'info');
   try {
     if (!modelsReady()) await loadModels();
     await prepareSource();
@@ -724,7 +717,6 @@ window.addEventListener('load', function () {
     _rightBackend = v;
     sS('Right backend: ' + backendLabel(v) + '. Click Run.', 'info');
   });
-  initSegmented('benchGroup', 'benchSelect');
   initSegmented('effectGroup', 'effectSelect', function (v) {
     $('bgImageBtn').style.display = v === 'image' ? 'inline-block' : 'none';
   });
