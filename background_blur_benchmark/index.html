@@ -528,8 +528,8 @@ function fmt(side) {
          '<div class="m-row"><span>Inference p90 / p99</span><b>' + p90.toFixed(2) + ' / ' + p99.toFixed(2) + ' ms</b></div>' +
          '<div class="m-row"><span>First frame</span><b>' + first + '</b></div>' +
          '<div class="section">CPU / energy</div>' +
-         '<div class="m-row"><span>Main-thread blocked / frame</span><b>' + blockAvg.toFixed(2) + ' ms</b></div>' +
-         '<div class="m-row"><span>Main-thread busy % of frame</span><b>' + busyPct.toFixed(0) + '%</b></div>' +
+         '<div class="m-row"><span>Main-thread blocked / inference</span><b>' + blockAvg.toFixed(2) + ' ms</b></div>' +
+         '<div class="m-row"><span>Main-thread busy % of inference</span><b>' + busyPct.toFixed(0) + '%</b></div>' +
          '<div class="m-row"><span>≈ CPU load (estimate)</span><b>' + (m.cpu.length ? cpuAvg.toFixed(0) + '%' : '—') + '</b></div>' +
          '<div class="m-row"><span>Long tasks</span><b>' + _jank[side] + '</b></div>' +
          '<div class="m-row"><span>JS heap</span><b>' + getMemoryMB() + ' MB</b></div>' +
@@ -666,7 +666,7 @@ async function benchmark() {
     rows += '<tr><td>Avg ms/frame</td><td>' + a.avg.toFixed(2) + '</td><td>' + b.avg.toFixed(2) + '</td></tr>';
     rows += '<tr><td>Median ms/frame</td><td>' + a.median.toFixed(2) + '</td><td>' + b.median.toFixed(2) + '</td></tr>';
     rows += '<tr><td>p90 / p99 (ms)</td><td>' + a.p90.toFixed(2) + ' / ' + a.p99.toFixed(2) + '</td><td>' + b.p90.toFixed(2) + ' / ' + b.p99.toFixed(2) + '</td></tr>';
-    rows += '<tr><td>Main-thread blocked / frame</td><td>' + a.blockAvg.toFixed(2) + ' ms</td><td>' + b.blockAvg.toFixed(2) + ' ms</td></tr>';
+    rows += '<tr><td>Main-thread blocked / inference</td><td>' + a.blockAvg.toFixed(2) + ' ms</td><td>' + b.blockAvg.toFixed(2) + ' ms</td></tr>';
     rows += '<tr><td>≈ CPU load</td><td>' + (a.cpu !== null ? a.cpu.toFixed(0) + '%' : '—') + '</td><td>' + (b.cpu !== null ? b.cpu.toFixed(0) + '%' : '—') + '</td></tr>';
     if (drainCpu !== null && drainAccel !== null) {
       rows += '<tr><td>Battery drain</td><td>' + drainCpu.toFixed(3) + ' %/min</td><td>' + drainAccel.toFixed(3) + ' %/min</td></tr>';
