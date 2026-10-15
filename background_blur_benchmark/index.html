@@ -28,10 +28,7 @@
 
   .side-by-side { display: flex; gap: 1rem; flex-wrap: wrap; }
   .side { flex: 1; min-width: 320px; }
-  .side h3 { font-size: .95rem; margin-bottom: .4rem; }
-  .side .tag { font-size: .7rem; padding: 1px 6px; border-radius: 3px; color: #fff; vertical-align: middle; }
-  .tag-wasm { background: #ff6f00; }
-  .tag-webnn { background: #0052cc; }
+  .side .controls { margin: 0 0 .5rem; }
   canvas { width: 100%; height: auto; display: block; background: #000; border-radius: 4px; }
   .metrics { font-size: .8rem; color: #333; margin-top: .4rem; line-height: 1.5; }
   .metrics b { color: rgba(0,47,167,1); }
@@ -66,25 +63,6 @@
         <button type="button" class="seg-btn" data-value="camera">Camera</button>
       </div>
       <input type="hidden" id="inputSelect" value="image">
-    </div>
-    <div class="controls" style="margin-top:.5rem;">
-      <span class="control-label">Left:</span>
-      <div class="segmented" id="leftGroup">
-        <button type="button" class="seg-btn" data-value="wasm">WASM</button>
-        <button type="button" class="seg-btn" data-value="cpu">CPU</button>
-        <button type="button" class="seg-btn" data-value="gpu">GPU</button>
-        <button type="button" class="seg-btn" data-value="npu">NPU</button>
-      </div>
-      <input type="hidden" id="leftSelect" value="wasm">
-
-      <span class="control-label">Right:</span>
-      <div class="segmented" id="rightGroup">
-        <button type="button" class="seg-btn" data-value="wasm">WASM</button>
-        <button type="button" class="seg-btn" data-value="cpu">CPU</button>
-        <button type="button" class="seg-btn" data-value="gpu">GPU</button>
-        <button type="button" class="seg-btn" data-value="npu">NPU</button>
-      </div>
-      <input type="hidden" id="rightSelect" value="npu">
     </div>
     <div class="controls" style="margin-top:.5rem;">
       <span class="control-label">Blur:</span>
@@ -122,12 +100,30 @@
   <div class="card">
     <div class="side-by-side">
       <div class="side">
-        <h3><span class="tag tag-wasm" id="leftTag">WASM</span></h3>
+        <div class="controls">
+          <span class="control-label">Left:</span>
+          <div class="segmented" id="leftGroup">
+            <button type="button" class="seg-btn" data-value="wasm">WASM</button>
+            <button type="button" class="seg-btn" data-value="cpu">CPU</button>
+            <button type="button" class="seg-btn" data-value="gpu">GPU</button>
+            <button type="button" class="seg-btn" data-value="npu">NPU</button>
+          </div>
+          <input type="hidden" id="leftSelect" value="wasm">
+        </div>
         <canvas id="canvasLeft" width="480" height="360"></canvas>
         <div class="metrics" id="metricsLeft"></div>
       </div>
       <div class="side">
-        <h3><span class="tag tag-webnn" id="rightTag">NPU</span></h3>
+        <div class="controls">
+          <span class="control-label">Right:</span>
+          <div class="segmented" id="rightGroup">
+            <button type="button" class="seg-btn" data-value="wasm">WASM</button>
+            <button type="button" class="seg-btn" data-value="cpu">CPU</button>
+            <button type="button" class="seg-btn" data-value="gpu">GPU</button>
+            <button type="button" class="seg-btn" data-value="npu">NPU</button>
+          </div>
+          <input type="hidden" id="rightSelect" value="npu">
+        </div>
         <canvas id="canvasRight" width="480" height="360"></canvas>
         <div class="metrics" id="metricsRight"></div>
       </div>
@@ -188,16 +184,7 @@ function initSegmented(groupId, inputId, cb) {
 }
 
 // ---- backend helpers ----
-function backendShort(b) { return b.toUpperCase(); }
 function backendLabel(b) { return b === 'wasm' ? 'WASM (CPU)' : 'WebNN ' + b.toUpperCase(); }
-function backendTagClass(b) { return b === 'wasm' ? 'tag-wasm' : 'tag-webnn'; }
-function updateTags() {
-  var lt = $('leftTag'), rt = $('rightTag');
-  lt.textContent = backendShort(_leftBackend);
-  lt.className = 'tag ' + backendTagClass(_leftBackend);
-  rt.textContent = backendShort(_rightBackend);
-  rt.className = 'tag ' + backendTagClass(_rightBackend);
-}
 
 // ---- feature detection helpers ----
 function hasGetUserMedia() { return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia); }
@@ -251,7 +238,6 @@ async function loadWasm() {
 }
 async function loadModels() {
   sS('Loading models (' + backendLabel(_leftBackend) + ' + ' + backendLabel(_rightBackend) + ')…', 'info');
-  updateTags();
   var needed = {};
   needed[_leftBackend] = true;
   needed[_rightBackend] = true;
@@ -733,12 +719,10 @@ window.addEventListener('load', function () {
   });
   initSegmented('leftGroup', 'leftSelect', function (v) {
     _leftBackend = v;
-    updateTags();
     sS('Left backend: ' + backendLabel(v) + '. Click Run.', 'info');
   });
   initSegmented('rightGroup', 'rightSelect', function (v) {
     _rightBackend = v;
-    updateTags();
     sS('Right backend: ' + backendLabel(v) + '. Click Run.', 'info');
   });
   initSegmented('benchGroup', 'benchSelect');
