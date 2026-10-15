@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Background Blur — CPU vs WebNN</title>
+<title>Background Blur — WASM vs WebNN</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: system-ui, -apple-system, sans-serif; background: #f5f5f5; color: #1a1a1a; padding: 1.5rem; }
@@ -14,7 +14,7 @@
   .controls { display: flex; gap: .75rem; align-items: center; flex-wrap: wrap; }
   .control-label { font-weight: 600; font-size: .85rem; }
   .segmented { display: inline-flex; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; }
-  .seg-btn { background: #fff; color: #1a1a1a; border: none; border-radius: 0; padding: .45rem .9rem; font-size: .85rem; font-weight: 600; min-width: 4rem; cursor: pointer; }
+  .seg-btn { background: #fff; color: #1a1a1a; border: none; border-radius: 0; padding: .4rem .75rem; font-size: .8rem; font-weight: 600; min-width: 3.2rem; cursor: pointer; }
   .seg-btn + .seg-btn { border-left: 1px solid #ddd; }
   .seg-btn:hover { background: #eef3ff; }
   .seg-btn.active { background: rgba(0,47,167,1); color: #fff; }
@@ -47,16 +47,15 @@
     display: none; margin-top: .5rem; padding: .75rem 1rem; border-radius: 6px;
     font-size: .9rem; font-weight: 600; line-height: 1.6;
   }
-  #verdict.win-npu { background: #e9f8f0; border-left: 4px solid #068906; }
-  #verdict.win-cpu { background: #fff3e0; border-left: 4px solid #ff6f00; }
+  #verdict.win-right { background: #e9f8f0; border-left: 4px solid #068906; }
+  #verdict.win-left { background: #fff3e0; border-left: 4px solid #ff6f00; }
   #verdict .big { font-size: 1.05rem; }
-  .delta-better { color: #068906; font-weight: 700; }
 </style>
 </head>
 <body>
 <div class="container">
-  <h1>Background Blur — CPU vs WebNN</h1>
-  <p class="subtitle">Same MediaPipe Selfie Segmentation model, pure WebNN on two devices: CPU vs NPU/GPU. Gaussian background blur + person kept sharp.</p>
+  <h1>Background Blur — WASM vs WebNN</h1>
+  <p class="subtitle">Same MediaPipe Selfie Segmentation model on two selectable backends (WASM / WebNN CPU / GPU / NPU). Gaussian background blur + person kept sharp.</p>
 
   <div class="card">
     <div class="controls">
@@ -67,17 +66,27 @@
         <button type="button" class="seg-btn" data-value="camera">Camera</button>
       </div>
       <input type="hidden" id="inputSelect" value="image">
-
-      <span class="control-label">WebNN device:</span>
-      <div class="segmented" id="deviceGroup">
+    </div>
+    <div class="controls" style="margin-top:.5rem;">
+      <span class="control-label">Left:</span>
+      <div class="segmented" id="leftGroup">
+        <button type="button" class="seg-btn" data-value="wasm">WASM</button>
         <button type="button" class="seg-btn" data-value="cpu">CPU</button>
         <button type="button" class="seg-btn" data-value="gpu">GPU</button>
         <button type="button" class="seg-btn" data-value="npu">NPU</button>
       </div>
-      <input type="hidden" id="deviceSelect" value="npu">
+      <input type="hidden" id="leftSelect" value="wasm">
 
-      <label style="font-size:.8rem;font-weight:600;"><input type="checkbox" id="useWasmCheck"> Use WASM (ONNX Runtime) for CPU side</label>
-
+      <span class="control-label">Right:</span>
+      <div class="segmented" id="rightGroup">
+        <button type="button" class="seg-btn" data-value="wasm">WASM</button>
+        <button type="button" class="seg-btn" data-value="cpu">CPU</button>
+        <button type="button" class="seg-btn" data-value="gpu">GPU</button>
+        <button type="button" class="seg-btn" data-value="npu">NPU</button>
+      </div>
+      <input type="hidden" id="rightSelect" value="npu">
+    </div>
+    <div class="controls" style="margin-top:.5rem;">
       <span class="control-label">Blur:</span>
       <input type="range" id="blurSlider" min="2" max="32" value="14">
       <span id="blurVal" style="font-size:.8rem;">14px</span>
@@ -113,14 +122,14 @@
   <div class="card">
     <div class="side-by-side">
       <div class="side">
-        <h3>CPU <span class="tag tag-wasm" id="cpuTag">WebNN</span></h3>
-        <canvas id="canvasWasm" width="480" height="360"></canvas>
-        <div class="metrics" id="metricsWasm"></div>
+        <h3>Left <span class="tag tag-wasm" id="leftTag">WASM</span></h3>
+        <canvas id="canvasLeft" width="480" height="360"></canvas>
+        <div class="metrics" id="metricsLeft"></div>
       </div>
       <div class="side">
-        <h3>WebNN — Accelerator <span class="tag tag-webnn" id="webnnTag">NPU</span></h3>
-        <canvas id="canvasWebnn" width="480" height="360"></canvas>
-        <div class="metrics" id="metricsWebnn"></div>
+        <h3>Right <span class="tag tag-webnn" id="rightTag">NPU</span></h3>
+        <canvas id="canvasRight" width="480" height="360"></canvas>
+        <div class="metrics" id="metricsRight"></div>
       </div>
     </div>
   </div>
@@ -141,15 +150,16 @@
 <script>
 'use strict';
 var IMGSZ = 256;
-var _cpuModel = null;
-var _webnnModel = null;
 var _wasmSession = null;
+var _webnnModels = {};       // cache: { cpu: model, gpu: model, npu: model }
+var _leftBackend = 'wasm';
+var _rightBackend = 'npu';
 var _inputMode = 'image';
 var _running = false;
 var _rafId = null;
 var _frameW = 480, _frameH = 360;
 var _battery = null;         // BatteryManager if available
-var _jank = { cpu: 0, accel: 0 };
+var _jank = { left: 0, right: 0 };
 var _longtaskObserver = null;
 var _bgImage = null;         // background image for "image" effect
 
@@ -157,7 +167,7 @@ var _bgImage = null;         // background image for "image" effect
 var _cpuWorker = null, _cpuBase = null, _cpuLoad = null, _cpuSamples = null, _collectCpu = false;
 
 function _newMetrics() { return { frames: 0, times: [], block: [], fps: 0, lastT: 0, firstFrame: null, cpu: [] }; }
-var _m = { cpu: _newMetrics(), accel: _newMetrics() };
+var _m = { left: _newMetrics(), right: _newMetrics() };
 
 function $(id){ return document.getElementById(id); }
 function sS(m, c){ var e = $('status'); e.textContent = m; e.className = 'status ' + (c || 'info'); }
@@ -177,12 +187,23 @@ function initSegmented(groupId, inputId, cb) {
   select(input.value);
 }
 
+// ---- backend helpers ----
+function backendShort(b) { return b.toUpperCase(); }
+function backendLabel(b) { return b === 'wasm' ? 'WASM (CPU)' : 'WebNN ' + b.toUpperCase(); }
+function backendTagClass(b) { return b === 'wasm' ? 'tag-wasm' : 'tag-webnn'; }
+function updateTags() {
+  var lt = $('leftTag'), rt = $('rightTag');
+  lt.textContent = backendShort(_leftBackend);
+  lt.className = 'tag ' + backendTagClass(_leftBackend);
+  rt.textContent = backendShort(_rightBackend);
+  rt.className = 'tag ' + backendTagClass(_rightBackend);
+}
+
 // ---- feature detection helpers ----
 function hasGetUserMedia() { return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia); }
 function getMemoryMB() { return performance.memory ? (performance.memory.usedJSHeapSize / 1048576).toFixed(1) : 'n/a'; }
 function getBattery() { return _battery ? Math.round(_battery.level * 100) + '%' + (_battery.charging ? ' ⚡' : '') : 'n/a'; }
 function batteryLevel() { return _battery ? _battery.level : null; }
-function hasBattery() { return !!_battery; }
 
 // ---- CPU load worker (estimate) ----
 function startCpuWorker() {
@@ -214,7 +235,6 @@ function startCpuWorker() {
 }
 
 // ---- model loading ----
-function useWasm() { return $('useWasmCheck').checked; }
 async function loadWebnn(deviceType) {
   var m = new SelfieSegmentationWebNN();
   await m.load(deviceType);
@@ -230,32 +250,32 @@ async function loadWasm() {
   return ort.InferenceSession.create(buf, { executionProviders: ['wasm'] });
 }
 async function loadModels() {
-  var dev = $('deviceSelect').value;
-  var cpuBackend = useWasm() ? 'WASM (ONNX)' : 'WebNN CPU';
-  sS('Loading models (' + cpuBackend + ' + WebNN ' + dev.toUpperCase() + ')…', 'info');
-  $('webnnTag').textContent = dev.toUpperCase();
-  if (useWasm()) {
-    if (!_wasmSession) {
-      try {
-        _wasmSession = await loadWasm();
-      } catch (e) {
-        console.error('WASM load failed, falling back to WebNN CPU:', e);
-        $('useWasmCheck').checked = false;
-        $('cpuTag').textContent = 'WebNN';
-        sS('WASM failed (' + e.message + ') — using WebNN CPU instead.', 'info');
-        if (!_cpuModel) _cpuModel = await loadWebnn('cpu');
+  sS('Loading models (' + backendLabel(_leftBackend) + ' + ' + backendLabel(_rightBackend) + ')…', 'info');
+  updateTags();
+  var needed = {};
+  needed[_leftBackend] = true;
+  needed[_rightBackend] = true;
+  for (var b in needed) {
+    if (b === 'wasm') {
+      if (!_wasmSession) {
+        try { _wasmSession = await loadWasm(); }
+        catch (e) { throw new Error('WASM failed: ' + e.message); }
       }
+    } else {
+      if (!_webnnModels[b]) _webnnModels[b] = await loadWebnn(b);
     }
-  } else {
-    if (!_cpuModel) _cpuModel = await loadWebnn('cpu');
   }
-  if (!_webnnModel) _webnnModel = await loadWebnn(dev);
   sS('Models ready. Click Run.', 'success');
 }
 function modelsReady() {
-  if (!_webnnModel) return false;
-  if (useWasm()) return !!_wasmSession;
-  return !!_cpuModel;
+  var needed = {};
+  needed[_leftBackend] = true;
+  needed[_rightBackend] = true;
+  for (var b in needed) {
+    if (b === 'wasm') { if (!_wasmSession) return false; }
+    else { if (!_webnnModels[b]) return false; }
+  }
+  return true;
 }
 
 // ---- input source ----
@@ -305,8 +325,8 @@ async function prepareSource() {
   var scale = Math.min(1, 480 / vw);
   _frameW = Math.max(2, Math.round(vw * scale));
   _frameH = Math.max(2, Math.round(vh * scale));
-  $('canvasWasm').width = _frameW; $('canvasWasm').height = _frameH;
-  $('canvasWebnn').width = _frameW; $('canvasWebnn').height = _frameH;
+  $('canvasLeft').width = _frameW; $('canvasLeft').height = _frameH;
+  $('canvasRight').width = _frameW; $('canvasRight').height = _frameH;
 }
 
 // ---- preprocessing (two variants: WebNN uses [-1,1], ONNX uses [0,1]) ----
@@ -365,7 +385,6 @@ function boxBlur(data, width, height, radius) {
   var div = 2 * radius + 1, inv = 1 / div;
   var tmp = new Uint8ClampedArray(data.length);
   var x, y, j, r, g, b, a, xx, yy, il, ir, it, ib, row;
-  // horizontal pass: data -> tmp
   for (y = 0; y < height; y++) {
     row = y * width;
     r = 0; g = 0; b = 0; a = 0;
@@ -385,7 +404,6 @@ function boxBlur(data, width, height, radius) {
       a += data[ir + 3] - data[il + 3];
     }
   }
-  // vertical pass: tmp -> data
   for (x = 0; x < width; x++) {
     r = 0; g = 0; b = 0; a = 0;
     for (y = -radius; y <= radius; y++) {
@@ -406,8 +424,6 @@ function boxBlur(data, width, height, radius) {
   }
 }
 
-// Draw the frame blurred. Uses ctx.filter when available (real Gaussian),
-// otherwise falls back to downscale + stack-blur (box-blur passes) + upscale.
 function drawBlurred(ctx, frameCanvas, W, H, radius) {
   if (blurSupported()) {
     ctx.filter = 'blur(' + radius + 'px)';
@@ -428,7 +444,6 @@ function drawBlurred(ctx, frameCanvas, W, H, radius) {
   }
 }
 
-// Draw the background for the chosen effect (person is composited separately).
 function drawBackground(ctx, frameCanvas, W, H, effect, radius, color, bgImage) {
   if (effect === 'color') {
     ctx.fillStyle = color;
@@ -463,8 +478,9 @@ function renderEffect(resultCanvas, frameCanvas, mask, effect, radius, color, bg
 }
 
 // ---- inference (returns { mask, blockMs, totalMs }) ----
-async function inferCpu(frameCanvas) {
-  if (useWasm()) {
+async function inferSide(side, frameCanvas) {
+  var b = side === 'left' ? _leftBackend : _rightBackend;
+  if (b === 'wasm') {
     var t = preprocess(frameCanvas, 'wasm');
     var feeds = { 'pixel_values': new ort.Tensor('float32', t, [1,3,IMGSZ,IMGSZ]) };
     var t0 = performance.now();
@@ -472,10 +488,7 @@ async function inferCpu(frameCanvas) {
     var ms = performance.now() - t0;
     return { mask: out['alphas'].data, blockMs: ms, totalMs: ms };
   }
-  return await _cpuModel.run(preprocess(frameCanvas));
-}
-async function inferWebnn(frameCanvas) {
-  return await _webnnModel.run(preprocess(frameCanvas));
+  return await _webnnModels[b].run(preprocess(frameCanvas));
 }
 
 function getFrameCanvas() {
@@ -536,8 +549,8 @@ function fmt(side) {
          '<div class="m-row"><span>Battery</span><b>' + getBattery() + '</b></div>';
 }
 function updateMetrics() {
-  $('metricsWasm').innerHTML = fmt('cpu');
-  $('metricsWebnn').innerHTML = fmt('accel');
+  $('metricsLeft').innerHTML = fmt('left');
+  $('metricsRight').innerHTML = fmt('right');
 }
 
 // ---- main loop ----
@@ -554,13 +567,13 @@ async function processOnce() {
   var frame = getFrameCanvas();
   var ep = getEffectParams();
 
-  var r = await inferCpu(frame);
-  renderEffect($('canvasWasm'), frame, r.mask, ep.effect, ep.radius, ep.color, ep.bgImage);
-  recordMetrics('cpu', r.totalMs, r.blockMs);
+  var r = await inferSide('left', frame);
+  renderEffect($('canvasLeft'), frame, r.mask, ep.effect, ep.radius, ep.color, ep.bgImage);
+  recordMetrics('left', r.totalMs, r.blockMs);
 
-  r = await inferWebnn(frame);
-  renderEffect($('canvasWebnn'), frame, r.mask, ep.effect, ep.radius, ep.color, ep.bgImage);
-  recordMetrics('accel', r.totalMs, r.blockMs);
+  r = await inferSide('right', frame);
+  renderEffect($('canvasRight'), frame, r.mask, ep.effect, ep.radius, ep.color, ep.bgImage);
+  recordMetrics('right', r.totalMs, r.blockMs);
 
   updateMetrics();
 }
@@ -576,12 +589,12 @@ async function start() {
     $('runBtn').disabled = true;
     if (!modelsReady()) await loadModels();
     await prepareSource();
-    _m = { cpu: _newMetrics(), accel: _newMetrics() };
+    _m = { left: _newMetrics(), right: _newMetrics() };
     var tRun = performance.now();
     if (_inputMode === 'image') {
       await processOnce();
-      _m.cpu.firstFrame = performance.now() - tRun;
-      _m.accel.firstFrame = performance.now() - tRun;
+      _m.left.firstFrame = performance.now() - tRun;
+      _m.right.firstFrame = performance.now() - tRun;
       updateMetrics();
       sS('Done (single frame). Switch to Video/Camera for live FPS.', 'success');
     } else {
@@ -613,14 +626,15 @@ async function runBenchSide(side, seconds) {
   _collectCpu = true;
   var frame = getFrameCanvas();
   var ep = getEffectParams();
+  var canvas = side === 'left' ? $('canvasLeft') : $('canvasRight');
   var start = performance.now();
   while (performance.now() - start < seconds * 1000) {
-    if (side === 'cpu') { var r = await inferCpu(frame); renderEffect($('canvasWasm'), frame, r.mask, ep.effect, ep.radius, ep.color, ep.bgImage); }
-    else { r = await inferWebnn(frame); renderEffect($('canvasWebnn'), frame, r.mask, ep.effect, ep.radius, ep.color, ep.bgImage); }
+    var r = await inferSide(side, frame);
+    renderEffect(canvas, frame, r.mask, ep.effect, ep.radius, ep.color, ep.bgImage);
     recordMetrics(side, r.totalMs, r.blockMs);
   }
   _collectCpu = false;
-  _cpuLoadsAvg[side] = avg(_cpuSamples);
+  var cpuAvg = _cpuSamples.length ? avg(_cpuSamples) : null;
   var elapsed = (performance.now() - start) / 1000;
   return {
     frames: _m[side].times.length,
@@ -630,11 +644,9 @@ async function runBenchSide(side, seconds) {
     p90: percentile(_m[side].times, 0.9),
     p99: percentile(_m[side].times, 0.99),
     blockAvg: avg(_m[side].block),
-    cpu: avg(_cpuSamples)
+    cpu: cpuAvg
   };
 }
-
-var _cpuLoadsAvg = { cpu: null, accel: null };
 
 async function benchmark() {
   $('benchBtn').disabled = true;
@@ -646,21 +658,20 @@ async function benchmark() {
     await prepareSource();
 
     var batStart = batteryLevel();
-    var a = await runBenchSide('cpu', seconds);
+    var a = await runBenchSide('left', seconds);
     var batMid = batteryLevel();
-    var b = await runBenchSide('accel', seconds);
+    var b = await runBenchSide('right', seconds);
     var batEnd = batteryLevel();
 
-    // battery drain (%/min) per side
-    var drainCpu = (batStart !== null && batMid !== null) ? (batStart - batMid) * 100 * 60 / seconds : null;
-    var drainAccel = (batMid !== null && batEnd !== null) ? (batMid - batEnd) * 100 * 60 / seconds : null;
+    var drainLeft = (batStart !== null && batMid !== null) ? (batStart - batMid) * 100 * 60 / seconds : null;
+    var drainRight = (batMid !== null && batEnd !== null) ? (batMid - batEnd) * 100 * 60 / seconds : null;
 
-    var dev = $('deviceSelect').value.toUpperCase();
-    var cpuName = useWasm() ? 'WASM (CPU)' : 'WebNN CPU';
+    var leftName = backendLabel(_leftBackend);
+    var rightName = backendLabel(_rightBackend);
     $('benchCard').style.display = '';
 
     var rows = '';
-    rows += '<tr><th></th><th>' + cpuName + '</th><th>WebNN ' + dev + '</th></tr>';
+    rows += '<tr><th></th><th>' + leftName + '</th><th>' + rightName + '</th></tr>';
     rows += '<tr><td>Frames</td><td>' + a.frames + '</td><td>' + b.frames + '</td></tr>';
     rows += '<tr><td>FPS</td><td>' + a.fps.toFixed(1) + '</td><td>' + b.fps.toFixed(1) + '</td></tr>';
     rows += '<tr><td>Avg ms/frame</td><td>' + a.avg.toFixed(2) + '</td><td>' + b.avg.toFixed(2) + '</td></tr>';
@@ -668,15 +679,15 @@ async function benchmark() {
     rows += '<tr><td>p90 / p99 (ms)</td><td>' + a.p90.toFixed(2) + ' / ' + a.p99.toFixed(2) + '</td><td>' + b.p90.toFixed(2) + ' / ' + b.p99.toFixed(2) + '</td></tr>';
     rows += '<tr><td>Main-thread blocked / inference</td><td>' + a.blockAvg.toFixed(2) + ' ms</td><td>' + b.blockAvg.toFixed(2) + ' ms</td></tr>';
     rows += '<tr><td>≈ CPU load</td><td>' + (a.cpu !== null ? a.cpu.toFixed(0) + '%' : '—') + '</td><td>' + (b.cpu !== null ? b.cpu.toFixed(0) + '%' : '—') + '</td></tr>';
-    if (drainCpu !== null && drainAccel !== null) {
-      rows += '<tr><td>Battery drain</td><td>' + drainCpu.toFixed(3) + ' %/min</td><td>' + drainAccel.toFixed(3) + ' %/min</td></tr>';
-      rows += '<tr><td>Energy / frame (drain ÷ frames)</td><td>' + (drainCpu / Math.max(1,a.frames)).toExponential(2) + '</td><td>' + (drainAccel / Math.max(1,b.frames)).toExponential(2) + '</td></tr>';
+    if (drainLeft !== null && drainRight !== null) {
+      rows += '<tr><td>Battery drain</td><td>' + drainLeft.toFixed(3) + ' %/min</td><td>' + drainRight.toFixed(3) + ' %/min</td></tr>';
+      rows += '<tr><td>Energy / frame</td><td>' + (drainLeft / Math.max(1,a.frames)).toExponential(2) + '</td><td>' + (drainRight / Math.max(1,b.frames)).toExponential(2) + '</td></tr>';
     } else {
       rows += '<tr><td>Battery drain</td><td colspan="2">n/a (no getBattery or charging)</td></tr>';
     }
     $('benchTable').innerHTML = rows;
 
-    renderVerdict(a, b, drainCpu, drainAccel, cpuName, dev);
+    renderVerdict(a, b, drainLeft, drainRight, leftName, rightName);
     sS('Benchmark complete.', 'success');
   } catch (e) {
     sS('Benchmark error: ' + e.message, 'error');
@@ -686,24 +697,24 @@ async function benchmark() {
   }
 }
 
-function renderVerdict(a, b, drainCpu, drainAccel, cpuName, dev) {
+function renderVerdict(a, b, drainLeft, drainRight, leftName, rightName) {
   var v = $('verdict');
   var speedup = b.fps / Math.max(0.001, a.fps);
   var cpuReduction = (a.blockAvg > 0) ? (1 - b.blockAvg / a.blockAvg) * 100 : 0;
-  var batteryReduction = (drainCpu !== null && drainCpu > 0) ? (1 - drainAccel / drainCpu) * 100 : null;
+  var batteryReduction = (drainLeft !== null && drainLeft > 0) ? (1 - drainRight / drainLeft) * 100 : null;
 
-  var winnerIsAccel = speedup >= 1;
+  var winnerIsRight = speedup >= 1;
   v.style.display = '';
-  v.className = winnerIsAccel ? 'win-npu' : 'win-cpu';
+  v.className = winnerIsRight ? 'win-right' : 'win-left';
 
   var lines = [];
-  var winner = winnerIsAccel ? 'WebNN ' + dev : cpuName;
+  var winner = winnerIsRight ? rightName : leftName;
   lines.push('<span class="big">' + winner + ' wins</span>');
   lines.push(speedup >= 1
     ? '— <b>' + speedup.toFixed(1) + '× faster</b> (FPS)'
     : '— <b>' + (1/speedup).toFixed(1) + '× slower</b> (FPS)');
   lines.push('— <b>' + Math.max(0, cpuReduction).toFixed(0) + '% less main-thread blocking</b>');
-  if (batteryReduction !== null && drainCpu !== null && drainCpu > 0) {
+  if (batteryReduction !== null && drainLeft !== null && drainLeft > 0) {
     lines.push('— <b>' + Math.max(0, batteryReduction).toFixed(0) + '% less battery drain</b>');
   }
   v.innerHTML = lines.join('<br>');
@@ -720,19 +731,21 @@ window.addEventListener('load', function () {
     _inputMode = v;
     $('runBtn').textContent = v === 'image' ? 'Run' : 'Start';
   });
-  initSegmented('deviceGroup', 'deviceSelect', function (v) {
-    _webnnModel = null;
-    $('webnnTag').textContent = v.toUpperCase();
+  initSegmented('leftGroup', 'leftSelect', function (v) {
+    _leftBackend = v;
+    updateTags();
+    sS('Left backend: ' + backendLabel(v) + '. Click Run.', 'info');
+  });
+  initSegmented('rightGroup', 'rightSelect', function (v) {
+    _rightBackend = v;
+    updateTags();
+    sS('Right backend: ' + backendLabel(v) + '. Click Run.', 'info');
   });
   initSegmented('benchGroup', 'benchSelect');
   initSegmented('effectGroup', 'effectSelect', function (v) {
     $('bgImageBtn').style.display = v === 'image' ? 'inline-block' : 'none';
   });
   $('blurSlider').addEventListener('input', function () { $('blurVal').textContent = this.value + 'px'; });
-  $('useWasmCheck').addEventListener('change', function () {
-    $('cpuTag').textContent = this.checked ? 'WASM' : 'WebNN';
-    sS('CPU backend: ' + (this.checked ? 'WASM (ONNX Runtime)' : 'WebNN CPU') + '. Click Run.', 'info');
-  });
   $('bgImageInput').addEventListener('change', function (e) {
     var f = e.target.files[0]; if (!f) return;
     var url = URL.createObjectURL(f);
@@ -750,7 +763,7 @@ window.addEventListener('load', function () {
     try {
       _longtaskObserver = new PerformanceObserver(function (list) {
         for (var e of list.getEntries()) {
-          if (_running) { _jank.cpu++; _jank.accel++; }
+          if (_running) { _jank.left++; _jank.right++; }
         }
       });
       _longtaskObserver.observe({ entryTypes: ['longtask'] });
