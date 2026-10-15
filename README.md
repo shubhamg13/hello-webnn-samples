@@ -51,6 +51,7 @@ CPU / GPU / NPU device selector where supported.
 | Virtual Try-On | Realtime virtual makeup / lip try-on | [`virtual_tryon/`](virtual_tryon/) |
 | Erase People | YOLOv8n/s-seg instance segmentation (pure WebNN) — keep center person, erase others | [`erase_people/`](erase_people/) |
 | Background Blur (CPU vs WebNN) | MediaPipe selfie segmentation on WASM (CPU) vs pure WebNN (NPU/GPU) — side-by-side resource comparison | [`background_blur_benchmark/`](background_blur_benchmark/) |
+| GemSeek (AI Chat demo) | Gemini/DeepSeek-style chat UI with image upload + scripted error responses (dummy page) | [`gemseek/`](gemseek/) |
 
 ### TensorFlow.js / TFLite
 
