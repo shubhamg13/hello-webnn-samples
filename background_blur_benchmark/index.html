@@ -62,7 +62,7 @@
         <button type="button" class="seg-btn" data-value="video">Video</button>
         <button type="button" class="seg-btn" data-value="camera">Camera</button>
       </div>
-      <input type="hidden" id="inputSelect" value="image">
+      <input type="hidden" id="inputSelect" value="video">
 
       <span class="control-label">Blur:</span>
       <input type="range" id="blurSlider" min="2" max="32" value="14">
@@ -74,7 +74,7 @@
         <button type="button" class="seg-btn" data-value="color">Color</button>
         <button type="button" class="seg-btn" data-value="image">Image</button>
       </div>
-      <input type="hidden" id="effectSelect" value="blur">
+      <input type="hidden" id="effectSelect" value="color">
       <input type="color" id="bgColor" value="#008080" title="Background color">
       <input type="file" id="bgImageInput" accept="image/*" style="display:none">
       <button id="bgImageBtn" onclick="document.getElementById('bgImageInput').click()" style="display:none;">BG Image</button>
